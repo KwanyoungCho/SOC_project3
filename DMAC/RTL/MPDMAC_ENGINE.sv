@@ -196,21 +196,21 @@ module MPDMAC_ENGINE
         reg signed [6:0] rel_r, rel_c;  // Relative to center
         begin
             // Convert output coordinates to source coordinates with mirror padding
-            // Output matrix: (0 to width+1) -> Source matrix: (1 to width)
+            // 정답 분석: output(0,0)=443=source[1][1], output(0,9)=328=source[1][6] (0-based)
             if (out_r == 0) begin
-                src_r = 2;  // Top padding: mirror from row 2 (1-based)
+                src_r = 1;  // Top padding: mirror from row 1 (0-based)
             end else if (out_r == width + 1) begin
-                src_r = width - 1;  // Bottom padding: mirror from second-to-last row
+                src_r = width - 2;  // Bottom padding: mirror from second-to-last row (0-based)
             end else begin
-                src_r = out_r;  // Normal region: out_r maps to row out_r (1-based)
+                src_r = out_r - 1;  // Normal region: out_r-1 maps to source row (0-based)
             end
             
             if (out_c == 0) begin
-                src_c = 2;  // Left padding: mirror from col 2 (1-based)
+                src_c = 1;  // Left padding: mirror from col 1 (0-based)
             end else if (out_c == width + 1) begin
-                src_c = width - 1;  // Right padding: mirror from second-to-last col
+                src_c = width - 2;  // Right padding: mirror from second-to-last col (0-based)
             end else begin
-                src_c = out_c;  // Normal region: out_c maps to col out_c (1-based)
+                src_c = out_c - 1;  // Normal region: out_c-1 maps to source col (0-based)
             end
             
             // Calculate relative position to current center
@@ -272,9 +272,9 @@ module MPDMAC_ENGINE
                         block_row <= 6'd0;
                         block_col <= 6'd0;
                         
-                        // Start with center at (1,1) for first 2x2 block at (0,0)
-                        center_row <= 7'd1;
-                        center_col <= 7'd1;
+                        // Start with center at (0,0) for first 2x2 block at (0,0) - 0-based source coords
+                        center_row <= 7'd0;
+                        center_col <= 7'd0;
                         
                         state <= S_READ_3x3;
                         read_count <= 4'd0;
@@ -435,9 +435,9 @@ module MPDMAC_ENGINE
                         center_col <= center_col + 2;
                     end else begin
                         block_col <= 6'd0;
-                        center_col <= 7'd1;
+                        center_col <= 7'd0;  // 0-based source coords
                         block_row <= block_row + 2;
-                        center_row <= center_row + 2;
+                        center_row <= center_row + 2;  // 0-based source coords
                     end
                     
                     // Check if done - fixed completion condition
