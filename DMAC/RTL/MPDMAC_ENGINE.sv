@@ -283,25 +283,35 @@ module MPDMAC_ENGINE
                         target_out_r = center_row - 1 + (read_count / 3);
                         target_out_c = center_col - 1 + (read_count % 3);
                         
-                        // 출력 좌표를 소스 좌표로 변환 (패딩 적용)
-                        if (target_out_r <= 0) begin
-                            target_src_r = 2;  // 상단 패딩: row 2에서 미러링 (1-based)
-                        end else if (target_out_r >= mat_width + 1) begin
-                            target_src_r = mat_width - 1;  // 하단 패딩: 마지막에서 두 번째 row에서 미러링
+                        // 출력 좌표를 소스 좌표로 변환 (미러 패딩 적용)
+                        // 정답: output(0,0)=443=source[1][1], output(0,1)=587=source[1][0]
+                        
+                        // Row 변환 (0-based)
+                        if (target_out_r < 0) begin
+                            // 상단 패딩: -target_out_r로 미러링
+                            target_src_r = -target_out_r;  // out_r=-1 → src_r=1
+                        end else if (target_out_r >= mat_width) begin
+                            // 하단 패딩
+                            target_src_r = 2 * mat_width - 1 - target_out_r;
                         end else begin
-                            target_src_r = target_out_r + 1;  // 정상 영역: out_r+1이 소스 row (1-based)
+                            // 정상 영역: 그대로 매핑
+                            target_src_r = target_out_r;
                         end
                         
-                        if (target_out_c <= 0) begin
-                            target_src_c = 2;  // 좌측 패딩: col 2에서 미러링 (1-based)
-                        end else if (target_out_c >= mat_width + 1) begin
-                            target_src_c = mat_width - 1;  // 우측 패딩: 마지막에서 두 번째 col에서 미러링
+                        // Column 변환 (0-based) 
+                        if (target_out_c < 0) begin
+                            // 좌측 패딩: -target_out_c로 미러링
+                            target_src_c = -target_out_c;  // out_c=-1 → src_c=1
+                        end else if (target_out_c >= mat_width) begin
+                            // 우측 패딩
+                            target_src_c = 2 * mat_width - 1 - target_out_c;
                         end else begin
-                            target_src_c = target_out_c + 1;  // 정상 영역: out_c+1이 소스 col (1-based)
+                            // 정상 영역: 그대로 매핑
+                            target_src_c = target_out_c;
                         end
                         
-                        // Calculate read address
-                        read_addr_offset = ((target_src_r - 1) * mat_width + (target_src_c - 1)) * 4;
+                        // 주소 계산 (0-based → 바이트 주소)
+                        read_addr_offset = (target_src_r * mat_width + target_src_c) * 4;
                         
                         ar_valid <= 1'b1;
                         ar_addr <= src_addr + read_addr_offset;
