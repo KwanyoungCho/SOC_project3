@@ -80,7 +80,7 @@ module MPDMAC_ENGINE
     reg [31:0] src_row1 [0:63];  // Next row  
     reg        row0_valid;
     reg        row1_valid;
-    reg [5:0]  cached_row;       // Which source row is in row0 (1-based)
+    reg [5:0]  cached_row;       // Which source row is in row0 (0-based)
     
     // AXI control signals
     reg        ar_valid;
@@ -278,7 +278,7 @@ module MPDMAC_ENGINE
                         r_ready <= 1'b1;
                         read_cnt <= 6'd0;
                         reading_row1 <= 1'b0;
-                        cached_row <= 6'd1;  // 읽고 있는 소스 행 번호 (1-based)
+                        cached_row <= 6'd0;  // 0-based index of row being read
                     end else begin
                         done <= 1'b1;
                     end
@@ -304,7 +304,7 @@ module MPDMAC_ENGINE
                                 reading_row1 <= 1'b1;
                                 read_cnt <= 6'd0;
                                 ar_valid <= 1'b1;
-                                ar_addr <= src_addr + cached_row * mat_width * 4;  // 다음 행
+                                ar_addr <= src_addr + (cached_row + 1) * mat_width * 4;  // next row
                                 ar_len <= mat_width - 1;
                             end else begin
                                 // 두 번째 행 읽기 완료 또는 마지막 행
@@ -423,7 +423,7 @@ module MPDMAC_ENGINE
                                 end
                                 
                                 ar_valid <= 1'b1;
-                                ar_addr <= src_addr + (req_row - 1) * mat_width * 4;
+                                ar_addr <= src_addr + req_row * mat_width * 4;
                                 ar_len <= mat_width - 1;
                                 r_ready <= 1'b1;
                                 read_cnt <= 6'd0;
