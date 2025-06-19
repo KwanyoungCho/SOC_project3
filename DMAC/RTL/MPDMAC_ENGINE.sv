@@ -198,17 +198,17 @@ module MPDMAC_ENGINE
             // Convert output coordinates to source coordinates with mirror padding
             // Output matrix: (0 to width+1) -> Source matrix: (1 to width)
             if (out_r == 0) begin
-                src_r = 1;  // Top padding: mirror from row 1
+                src_r = 2;  // Top padding: mirror from row 2 (1-based)
             end else if (out_r == width + 1) begin
-                src_r = width;  // Bottom padding: mirror from last row
+                src_r = width - 1;  // Bottom padding: mirror from second-to-last row
             end else begin
                 src_r = out_r;  // Normal region: out_r maps to row out_r (1-based)
             end
             
             if (out_c == 0) begin
-                src_c = 1;  // Left padding: mirror from col 1
+                src_c = 2;  // Left padding: mirror from col 2 (1-based)
             end else if (out_c == width + 1) begin
-                src_c = width;  // Right padding: mirror from last col
+                src_c = width - 1;  // Right padding: mirror from second-to-last col
             end else begin
                 src_c = out_c;  // Normal region: out_c maps to col out_c (1-based)
             end
