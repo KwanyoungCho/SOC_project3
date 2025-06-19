@@ -23,6 +23,20 @@ Mirror Padding Matrix:
 2319 2601 2319  406 3543  291 3590   74 2378   74
  160 2621  160 1018 3572  819 1792 3036 3440 3036
 
+---------------------------------------------------
+Configuration test
+MPDMAC_SRC_ADDR(pass): 00000000
+MPDMAC_DST_ADDR(pass): 00000a00
+MPDMAC_MAT_WIDTH(pass): 00000008
+---------------------------------------------------
+DMA start
+---------------------------------------------------
+DMA completed!
+---------------------------------------------------
+Compare Answer &  Matrix
+---------------------------------------------------
+
+
 Transferred Matrix:
  443  587  443 2433 2226 1971 2315  328  225    0
  205  633  205 3218   69 2729 3230 3037 3520    0
@@ -34,3 +48,23 @@ Transferred Matrix:
  160 2621  160 1018 3572  819 1792 3036 3440    0
 2319 2601 2319  406 3543  291 3590   74 2378    0
    0    0    0    0    0    0    0    0    0    0
+
+Error: answer_matrix[0][9] != transferred_matrix[9][0] | MissMatch!
+Error: answer_matrix[1][9] != transferred_matrix[9][1] | MissMatch!
+Error: answer_matrix[2][9] != transferred_matrix[9][2] | MissMatch!
+Error: answer_matrix[3][9] != transferred_matrix[9][3] | MissMatch!
+Error: answer_matrix[4][9] != transferred_matrix[9][4] | MissMatch!
+Error: answer_matrix[5][9] != transferred_matrix[9][5] | MissMatch!
+Error: answer_matrix[6][9] != transferred_matrix[9][6] | MissMatch!
+Error: answer_matrix[7][9] != transferred_matrix[9][7] | MissMatch!
+Error: answer_matrix[8][9] != transferred_matrix[9][8] | MissMatch!
+Error: answer_matrix[9][0] != transferred_matrix[0][9] | MissMatch!
+Error: answer_matrix[9][1] != transferred_matrix[1][9] | MissMatch!
+Error: answer_matrix[9][2] != transferred_matrix[2][9] | MissMatch!
+Error: answer_matrix[9][3] != transferred_matrix[3][9] | MissMatch!
+Error: answer_matrix[9][4] != transferred_matrix[4][9] | MissMatch!
+Error: answer_matrix[9][5] != transferred_matrix[5][9] | MissMatch!
+Error: answer_matrix[9][6] != transferred_matrix[6][9] | MissMatch!
+Error: answer_matrix[9][7] != transferred_matrix[7][9] | MissMatch!
+Error: answer_matrix[9][8] != transferred_matrix[8][9] | MissMatch!
+Error: answer_matrix[9][9] != transferred_matrix[9][9] | MissMatch!

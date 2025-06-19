@@ -446,7 +446,7 @@ module MPDMAC_ENGINE
                 S_NEXT_BLOCK: begin
                     // Move to next 2x2 block
                     // Output matrix is (width+2) x (width+2), so we need blocks at 0,2,4,...,width
-                    if (block_col < mat_width) begin  // Changed condition to process all columns including last
+                    if (block_col <= mat_width) begin  // Changed condition to process all columns including last
                         block_col <= block_col + 2;
                         center_col <= center_col + 2;
                     end else begin
