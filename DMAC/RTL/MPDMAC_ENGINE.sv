@@ -195,29 +195,70 @@ module MPDMAC_ENGINE
         reg signed [6:0] src_r, src_c;  // 1-based source coordinates
         reg signed [6:0] rel_r, rel_c;  // Relative to center
         begin
-            // 정답 분석 기반 올바른 미러 패딩 규칙
-            // 정답 첫 행: 443 587 443... = 원본 두번째 행의 미러링
-            // 정답 마지막 행: 160 2621 160... = 원본 마지막에서 두번째 행의 미러링
+            // Case별 명확한 처리 - 각 영역을 독립적으로 처리
             
-            // Row 처리
-            if (out_r == 0) begin
-                src_r = 2;  // Top padding: mirror from source row 2 (1-based)
-            end else if (out_r == width + 1) begin
-                src_r = width - 1;  // Bottom padding: mirror from source row (width-1)
-            end else begin
-                src_r = out_r;  // Normal region: out_r maps to source row out_r
-            end
+            case ({(out_r == 0), (out_r == width + 1), (out_c == 0), (out_c == width + 1)})
+                // 4'b0000: Normal region (1 ≤ r ≤ width, 1 ≤ c ≤ width)
+                4'b0000: begin
+                    src_r = out_r;
+                    src_c = out_c;
+                end
+                
+                // 4'b1000: Top edge (r=0, 1 ≤ c ≤ width) - 잘 되는 패턴
+                4'b1000: begin
+                    src_r = 2;  // mirror from row 2
+                    src_c = out_c;
+                end
+                
+                // 4'b0100: Bottom edge (r=width+1, 1 ≤ c ≤ width) - Top의 반대
+                4'b0100: begin
+                    src_r = width - 1;  // mirror from row (width-1)
+                    src_c = out_c;
+                end
+                
+                // 4'b0010: Left edge (1 ≤ r ≤ width, c=0) - 잘 되는 패턴
+                4'b0010: begin
+                    src_r = out_r;
+                    src_c = 2;  // mirror from col 2
+                end
+                
+                // 4'b0001: Right edge (1 ≤ r ≤ width, c=width+1) - Left의 반대
+                4'b0001: begin
+                    src_r = out_r;
+                    src_c = width - 1;  // mirror from col (width-1)
+                end
+                
+                // 4'b1010: Top-Left corner (r=0, c=0) - 잘 되는 패턴
+                4'b1010: begin
+                    src_r = 2;  // mirror from row 2
+                    src_c = 2;  // mirror from col 2
+                end
+                
+                // 4'b1001: Top-Right corner (r=0, c=width+1) - TL의 column 반대
+                4'b1001: begin
+                    src_r = 2;  // mirror from row 2
+                    src_c = width - 1;  // mirror from col (width-1)
+                end
+                
+                // 4'b0110: Bottom-Left corner (r=width+1, c=0) - TL의 row 반대
+                4'b0110: begin
+                    src_r = width - 1;  // mirror from row (width-1)
+                    src_c = 2;  // mirror from col 2
+                end
+                
+                // 4'b0101: Bottom-Right corner (r=width+1, c=width+1) - TL의 완전 반대
+                4'b0101: begin
+                    src_r = width - 1;  // mirror from row (width-1)
+                    src_c = width - 1;  // mirror from col (width-1)
+                end
+                
+                default: begin
+                    src_r = out_r;
+                    src_c = out_c;
+                end
+            endcase
             
-            // Column 처리
-            if (out_c == 0) begin
-                src_c = 2;  // Left padding: mirror from source col 2 (1-based)
-            end else if (out_c == width + 1) begin
-                src_c = width - 1;  // Right padding: mirror from source col (width-1)
-            end else begin
-                src_c = out_c;  // Normal region: out_c maps to source col out_c
-            end
-            
-            // 정답 검증:
+            // 정답 검증 (width=8일 때):
             // TL (0,0): src_r=2, src_c=2 → source[1][1] = 443 ✓
             // TR (0,9): src_r=2, src_c=7 → source[1][6] = 328 ✓  
             // BL (9,0): src_r=7, src_c=2 → source[6][1] = 160 ✓
