@@ -146,7 +146,7 @@ module MPDMAC_ENGINE
             src_addr <= 32'd0;
             dst_addr <= 32'd0;
             mat_width <= 6'd0;
-            done <= 1'b0;
+            done <= 1'b1;
             
             row_idx <= 6'd0;
             col_idx <= 6'd0;
@@ -294,8 +294,9 @@ module MPDMAC_ENGINE
         
         case (state)
             S_IDLE: begin
-                done_n = 1'b0;
+                done_n = 1'b1;  // Keep done high in IDLE state
                 if (start_i) begin
+                    done_n = 1'b0;  // Clear done when starting
                     src_addr_n = src_addr_i;
                     dst_addr_n = dst_addr_i;
                     mat_width_n = mat_width_i;
@@ -512,6 +513,7 @@ module MPDMAC_ENGINE
                 done_n = 1'b1;
                 if (!start_i) begin
                     state_n = S_IDLE;
+                    // done_n remains 1'b1 when going to IDLE
                 end
             end
         endcase
