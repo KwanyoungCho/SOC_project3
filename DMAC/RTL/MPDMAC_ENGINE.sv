@@ -192,33 +192,19 @@ module MPDMAC_ENGINE
         input [5:0] out_r;  // 0-based output row
         input [5:0] out_c;  // 0-based output col
         input [5:0] width;
-        reg signed [6:0] src_r, src_c;  // 1-based source coordinates
         reg signed [6:0] rel_r, rel_c;  // Relative to center
+        reg [3:0] buf_idx;
         begin
-            // Convert output coordinates to source coordinates with mirror padding
-            // Output matrix: (0 to width+1) -> Source matrix: (1 to width)
-            if (out_r == 0) begin
-                src_r = 1;  // Top padding: mirror from row 1
-            end else if (out_r == width + 1) begin
-                src_r = width;  // Bottom padding: mirror from last row
-            end else begin
-                src_r = out_r;  // Normal region: out_r maps to row out_r (1-based)
-            end
-            
-            if (out_c == 0) begin
-                src_c = 1;  // Left padding: mirror from col 1
-            end else if (out_c == width + 1) begin
-                src_c = width;  // Right padding: mirror from last col
-            end else begin
-                src_c = out_c;  // Normal region: out_c maps to col out_c (1-based)
-            end
-            
             // Calculate relative position to current center
-            rel_r = src_r - center_row;
-            rel_c = src_c - center_col;
+            rel_r = out_r - center_row;
+            rel_c = out_c - center_col;
             
-            // Get value from buffer
-            calc_output_value = get_buffer_value(rel_r, rel_c);
+            // Convert relative position to buffer index
+            // Buffer layout: [0][1][2]  <- (center_r-1)
+            //               [3][4][5]  <- (center_r)
+            //               [6][7][8]  <- (center_r+1)
+            buf_idx = (rel_r + 1) * 3 + (rel_c + 1);
+            calc_output_value = buffer_3x3[buf_idx];
         end
     endfunction
     
@@ -272,9 +258,9 @@ module MPDMAC_ENGINE
                         block_row <= 6'd0;
                         block_col <= 6'd0;
                         
-                        // Start with center at (1,1) for first 2x2 block at (0,0)
-                        center_row <= 7'd1;
-                        center_col <= 7'd1;
+                        // 첫 번째 2x2 블록 (0,0)의 중심은 (0,0) - 출력 매트릭스 기준
+                        center_row <= 7'd0;  // 출력 매트릭스 기준 0-based
+                        center_col <= 7'd0;  // 출력 매트릭스 기준 0-based
                         
                         state <= S_READ_3x3;
                         read_count <= 4'd0;
@@ -288,15 +274,34 @@ module MPDMAC_ENGINE
                 S_READ_3x3: begin
                     if (!reading_active) begin
                         // Start reading the next element of 3x3 region
-                        reg signed [6:0] target_r, target_c;
+                        reg signed [6:0] target_out_r, target_out_c;  // 출력 매트릭스 좌표
+                        reg signed [6:0] target_src_r, target_src_c;  // 소스 매트릭스 좌표
                         reg [31:0] read_addr_offset;
                         
                         // Calculate which element we're reading (row-major order)
-                        target_r = center_row - 1 + (read_count / 3);
-                        target_c = center_col - 1 + (read_count % 3);
+                        // 출력 매트릭스 기준으로 center 주변 3x3 좌표 계산
+                        target_out_r = center_row - 1 + (read_count / 3);
+                        target_out_c = center_col - 1 + (read_count % 3);
                         
-                        // Calculate read address with mirroring
-                        read_addr_offset = get_mirrored_addr(target_r, target_c, mat_width);
+                        // 출력 좌표를 소스 좌표로 변환 (패딩 적용)
+                        if (target_out_r <= 0) begin
+                            target_src_r = 1;  // 상단 패딩: row 1에서 미러링
+                        end else if (target_out_r >= mat_width + 1) begin
+                            target_src_r = mat_width;  // 하단 패딩: 마지막 row에서 미러링
+                        end else begin
+                            target_src_r = target_out_r;  // 정상 영역
+                        end
+                        
+                        if (target_out_c <= 0) begin
+                            target_src_c = 1;  // 좌측 패딩: col 1에서 미러링
+                        end else if (target_out_c >= mat_width + 1) begin
+                            target_src_c = mat_width;  // 우측 패딩: 마지막 col에서 미러링
+                        end else begin
+                            target_src_c = target_out_c;  // 정상 영역
+                        end
+                        
+                        // Calculate read address
+                        read_addr_offset = ((target_src_r - 1) * mat_width + (target_src_c - 1)) * 4;
                         
                         ar_valid <= 1'b1;
                         ar_addr <= src_addr + read_addr_offset;
@@ -432,12 +437,12 @@ module MPDMAC_ENGINE
                     // Move to next 2x2 block
                     if (block_col + 2 < mat_width + 2) begin
                         block_col <= block_col + 2;
-                        center_col <= center_col + 2;
+                        center_col <= center_col + 2;  // 출력 매트릭스 기준
                     end else begin
                         block_col <= 6'd0;
-                        center_col <= 7'd1;
+                        center_col <= 7'd0;  // 출력 매트릭스 기준
                         block_row <= block_row + 2;
-                        center_row <= center_row + 2;
+                        center_row <= center_row + 2;  // 출력 매트릭스 기준
                     end
                     
                     // Check if done - fixed completion condition
