@@ -202,52 +202,52 @@ module MPDMAC_ENGINE
         reg signed [6:0] src_r, src_c;  // 1-based source coordinates
         reg signed [6:0] rel_r, rel_c;  // Relative to center
         begin
-            // Convert output coordinates to source coordinates with mirror padding
-            // Output matrix is (width+2) x (width+2), Source matrix is width x width
+            // 출력 매트릭스는 (width+2) x (width+2), 소스 매트릭스는 width x width
+            // 출력 좌표를 소스 좌표로 변환 (미러 패딩 포함)
             
-            // Row mirroring
+            // 행 변환: 출력 행 -> 소스 행 (1-based)
             if (out_r == 0) begin
-                // Top padding: mirror from row 1 (0-based) -> row 2 (1-based)
+                // 상단 패딩: 소스의 두 번째 행을 미러링 (1-based로 2)
                 src_r = 2;
             end else if (out_r == width + 1) begin
-                // Bottom padding: mirror from row (width-2) (0-based) -> row (width-1) (1-based)
+                // 하단 패딩: 소스의 마지막에서 두 번째 행을 미러링 (1-based로 width-1)
                 src_r = width - 1;
             end else begin
-                // Normal: out_r maps to src_r (both 1-based in this context)
+                // 일반 영역: out_r은 0-based이므로 1을 더해서 1-based로 변환
                 src_r = out_r;
             end
             
-            // Column mirroring
+            // 열 변환: 출력 열 -> 소스 열 (1-based)
             if (out_c == 0) begin
-                // Left padding: mirror from col 1 (0-based) -> col 2 (1-based)
+                // 좌측 패딩: 소스의 두 번째 열을 미러링 (1-based로 2)
                 src_c = 2;
             end else if (out_c == width + 1) begin
-                // Right padding: mirror from col (width-2) (0-based) -> col (width-1) (1-based)
+                // 우측 패딩: 소스의 마지막에서 두 번째 열을 미러링 (1-based로 width-1)
                 src_c = width - 1;
             end else begin
-                // Normal: out_c maps to src_c (both 1-based in this context)
+                // 일반 영역: out_c는 0-based이므로 1을 더해서 1-based로 변환
                 src_c = out_c;
             end
             
-            // Calculate relative position to current center
+            // 현재 중심에 대한 상대 위치 계산
             rel_r = src_r - center_row;
             rel_c = src_c - center_col;
             
-            // Debug for edge cases
+            // 디버깅 출력
             if (out_r >= width || out_c >= width) begin
                 $display("[DEBUG] calc_output_value: out(%d,%d) -> src(%d,%d) -> rel(%d,%d) vs center(%d,%d)", 
                          out_r, out_c, src_r, src_c, rel_r, rel_c, center_row, center_col);
             end
             
-            // Check if within 3x3 buffer range
+            // 3x3 버퍼 범위 내인지 확인
             if (rel_r >= -1 && rel_r <= 1 && rel_c >= -1 && rel_c <= 1) begin
-                // Convert to buffer index and get value
+                // 버퍼 인덱스로 변환하여 값 가져오기
                 calc_output_value = buffer_3x3[(rel_r + 1) * 3 + (rel_c + 1)];
                 if (out_r >= width || out_c >= width) begin
                     $display("[DEBUG] Buffer access: index=%d, value=%d", (rel_r + 1) * 3 + (rel_c + 1), calc_output_value);
                 end
             end else begin
-                // Should not happen in correct implementation
+                // 범위를 벗어나면 0 반환 (오류 상황)
                 calc_output_value = 32'd0;
                 $display("[DEBUG] ERROR: out_of_range out(%d,%d) rel(%d,%d) center(%d,%d)", 
                          out_r, out_c, rel_r, rel_c, center_row, center_col);
@@ -479,7 +479,7 @@ module MPDMAC_ENGINE
                                  (center_row + 2 <= mat_width) ? center_row + 2 : mat_width);
                     end
                     
-                    if (block_row > mat_width) begin
+                    if (block_row + 2 > mat_width + 2) begin
                         $display("[DEBUG] All blocks completed! Going to IDLE");
                         state <= S_IDLE;
                         done <= 1'b1;
