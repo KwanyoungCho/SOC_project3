@@ -57,26 +57,17 @@ module MPDMAC_ENGINE
 );
     // Design here
 
-    // ----------------------------------------------------------
+     // ----------------------------------------------------------
     // Parameters and internal signals
     // ----------------------------------------------------------
 
-    typedef enum logic [3:0] {
-        S_IDLE      = 4'd0,
-        S_RD0_AR    = 4'd1,
-        S_RD0_R     = 4'd2,
-        S_RD1_AR    = 4'd3,
-        S_RD1_R     = 4'd4,
-        S_RD2_AR    = 4'd5,
-        S_RD2_R     = 4'd6,
-        S_RD3_AR    = 4'd7,
-        S_RD3_R     = 4'd8,
-        S_AW0       = 4'd9,
-        S_W0        = 4'd10,
-        S_B0        = 4'd11,
-        S_AW1       = 4'd12,
-        S_W1        = 4'd13,
-        S_B1        = 4'd14
+    typedef enum logic [2:0] {
+        S_IDLE  = 3'd0,
+        S_AR    = 3'd1,
+        S_R     = 3'd2,
+        S_AW    = 3'd3,
+        S_W     = 3'd4,
+        S_B     = 3'd5
     } state_t;
 
     state_t                  state, state_n;
@@ -89,8 +80,12 @@ module MPDMAC_ENGINE
     reg [5:0]                row_n, col_n;
 
     reg [31:0]               buffer[1:0][1:0];
-    reg [1:0]                beat_cnt;
-    reg [31:0]               axi_addr;
+
+    reg [1:0]                ar_cnt, ar_cnt_n;
+    reg [2:0]                rd_cnt, rd_cnt_n;
+    reg [1:0]                aw_cnt, aw_cnt_n;
+    reg [2:0]                wr_cnt, wr_cnt_n;
+    reg [1:0]                b_cnt,  b_cnt_n;
 
     reg                      done, done_n;
 
@@ -124,8 +119,11 @@ module MPDMAC_ENGINE
             pad_width   <= 6'd0;
             row         <= 6'd0;
             col         <= 6'd0;
-            beat_cnt    <= 2'd0;
-            axi_addr    <= 32'd0;
+            ar_cnt      <= 2'd0;
+            rd_cnt      <= 3'd0;
+            aw_cnt      <= 2'd0;
+            wr_cnt      <= 3'd0;
+            b_cnt       <= 2'd0;
             buffer[0][0]<= 32'd0;
             buffer[0][1]<= 32'd0;
             buffer[1][0]<= 32'd0;
@@ -135,12 +133,24 @@ module MPDMAC_ENGINE
             state       <= state_n;
             row         <= row_n;
             col         <= col_n;
-            beat_cnt    <= (state==S_W0 || state==S_W1 || state==S_RD0_R || state==S_RD1_R || state==S_RD2_R || state==S_RD3_R) ? beat_cnt + 1'b1 : 2'd0;
-            axi_addr    <= (state==S_RD0_AR || state==S_RD1_AR || state==S_RD2_AR || state==S_RD3_AR || state==S_AW0 || state==S_AW1) ? axi_addr : axi_addr;
-            if (state==S_RD0_R && rvalid_i)      buffer[0][0] <= rdata_i;
-            if (state==S_RD1_R && rvalid_i)      buffer[0][1] <= rdata_i;
-            if (state==S_RD2_R && rvalid_i)      buffer[1][0] <= rdata_i;
-            if (state==S_RD3_R && rvalid_i)      buffer[1][1] <= rdata_i;
+            ar_cnt      <= ar_cnt_n;
+            rd_cnt      <= rd_cnt_n;
+            aw_cnt      <= aw_cnt_n;
+            wr_cnt      <= wr_cnt_n;
+            b_cnt       <= b_cnt_n;
+            if (state==S_R && rvalid_i)
+                case (rd_cnt)
+                    3'd0: buffer[0][0] <= rdata_i;
+                    3'd1: buffer[0][1] <= rdata_i;
+                    3'd2: buffer[1][0] <= rdata_i;
+                    3'd3: buffer[1][1] <= rdata_i;
+                endcase
+            if (state==S_IDLE && start_trig) begin
+                src_base    <= src_addr_i;
+                dst_base    <= dst_addr_i;
+                mat_width   <= mat_width_i;
+                pad_width   <= mat_width_i + 6'd2;
+            end
             done        <= done_n;
         end
     end
@@ -153,10 +163,8 @@ module MPDMAC_ENGINE
     wire [5:0] src_c0 = mirror_idx(col    , pad_width, mat_width);
     wire [5:0] src_c1 = mirror_idx(col+1 , pad_width, mat_width);
 
-    wire [31:0] src_addr00 = src_base + (((src_r0 * mat_width) + src_c0) << 2);
-    wire [31:0] src_addr01 = src_base + (((src_r0 * mat_width) + src_c1) << 2);
-    wire [31:0] src_addr10 = src_base + (((src_r1 * mat_width) + src_c0) << 2);
-    wire [31:0] src_addr11 = src_base + (((src_r1 * mat_width) + src_c1) << 2);
+    wire [31:0] src_addr0 = src_base + (((src_r0 * mat_width) + src_c0) << 2);
+    wire [31:0] src_addr1 = src_base + (((src_r1 * mat_width) + src_c0) << 2);
 
     wire [31:0] dst_addr0  = dst_base + (((row   * pad_width) + col) << 2);
     wire [31:0] dst_addr1  = dst_base + ((((row+1) * pad_width) + col) << 2);
@@ -169,101 +177,89 @@ module MPDMAC_ENGINE
         row_n     = row;
         col_n     = col;
         done_n    = done;
+        ar_cnt_n  = ar_cnt;
+        rd_cnt_n  = rd_cnt;
+        aw_cnt_n  = aw_cnt;
+        wr_cnt_n  = wr_cnt;
+        b_cnt_n   = b_cnt;
 
         case (state)
             S_IDLE: begin
                 if (start_trig) begin
-                    state_n = S_RD0_AR;
-                    row_n   = 6'd0;
-                    col_n   = 6'd0;
-                    done_n  = 1'b0;
+                    state_n   = S_AR;
+                    row_n     = 6'd0;
+                    col_n     = 6'd0;
+                    ar_cnt_n  = 2'd0;
+                    rd_cnt_n  = 3'd0;
+                    aw_cnt_n  = 2'd0;
+                    wr_cnt_n  = 3'd0;
+                    b_cnt_n   = 2'd0;
+                    done_n    = 1'b0;
                 end
             end
 
-            // read four source words
-            S_RD0_AR: begin
+            S_AR: begin
                 if (arready_i) begin
-                    state_n = S_RD0_R;
-                end
-            end
-            S_RD0_R: begin
-                if (rvalid_i) begin
-                    state_n = S_RD1_AR;
-                end
-            end
-            S_RD1_AR: begin
-                if (arready_i) begin
-                    state_n = S_RD1_R;
-                end
-            end
-            S_RD1_R: begin
-                if (rvalid_i) begin
-                    state_n = S_RD2_AR;
-                end
-            end
-            S_RD2_AR: begin
-                if (arready_i) begin
-                    state_n = S_RD2_R;
-                end
-            end
-            S_RD2_R: begin
-                if (rvalid_i) begin
-                    state_n = S_RD3_AR;
-                end
-            end
-            S_RD3_AR: begin
-                if (arready_i) begin
-                    state_n = S_RD3_R;
-                end
-            end
-            S_RD3_R: begin
-                if (rvalid_i) begin
-                    state_n = S_AW0;
-                end
-            end
-
-            // write first row (2-beat burst)
-            S_AW0: begin
-                if (awready_i) begin
-                    state_n = S_W0;
-                end
-            end
-            S_W0: begin
-                if (wready_i && beat_cnt==1) begin
-                    state_n = S_B0;
-                end
-            end
-            S_B0: begin
-                if (bvalid_i) begin
-                    state_n = S_AW1;
-                end
-            end
-
-            // write second row (2-beat burst)
-            S_AW1: begin
-                if (awready_i) begin
-                    state_n = S_W1;
-                end
-            end
-            S_W1: begin
-                if (wready_i && beat_cnt==1) begin
-                    state_n = S_B1;
-                end
-            end
-            S_B1: begin
-                if (bvalid_i) begin
-                    if (row == pad_width-2 && col == pad_width-2) begin
-                        state_n = S_IDLE;
-                        done_n  = 1'b1;
+                    if (ar_cnt == 0) begin
+                        ar_cnt_n = 1;
                     end else begin
-                        // move to next tile
-                        if (col == pad_width-2) begin
-                            col_n = 6'd0;
-                            row_n = row + 6'd2;
+                        ar_cnt_n = 0;
+                        state_n  = S_R;
+                    end
+                end
+            end
+
+            S_R: begin
+                if (rvalid_i) begin
+                    if (rd_cnt == 3) begin
+                        rd_cnt_n = 0;
+                        state_n  = S_AW;
+                    end else begin
+                        rd_cnt_n = rd_cnt + 1;
+                    end
+                end
+            end
+
+            S_AW: begin
+                if (awready_i) begin
+                    if (aw_cnt == 0) begin
+                        aw_cnt_n = 1;
+                    end else begin
+                        aw_cnt_n = 0;
+                        state_n  = S_W;
+                    end
+                end
+            end
+
+            S_W: begin
+                if (wready_i) begin
+                    if (wr_cnt == 3) begin
+                        wr_cnt_n = 0;
+                        state_n  = S_B;
+                    end else begin
+                        wr_cnt_n = wr_cnt + 1;
+                    end
+                end
+            end
+
+            S_B: begin
+                if (bvalid_i) begin
+                    if (b_cnt == 0) begin
+                        b_cnt_n = 1;
+                    end else begin
+                        b_cnt_n = 0;
+                        if (row == pad_width-2 && col == pad_width-2) begin
+                            state_n = S_IDLE;
+                            done_n  = 1'b1;
                         end else begin
-                            col_n = col + 6'd2;
+                            if (col == pad_width-2) begin
+                                col_n = 6'd0;
+                                row_n = row + 6'd2;
+                            end else begin
+                                col_n = col + 6'd2;
+                            end
+                            state_n = S_AR;
                         end
-                        state_n = S_RD0_AR;
                     end
                 end
             end
@@ -276,7 +272,7 @@ module MPDMAC_ENGINE
     assign arid_o     = 4'd0;
     assign arsize_o   = 3'b010; // 4 bytes
     assign arburst_o  = 2'b01;  // INCR
-    assign arlen_o    = 4'd0;   // single beat
+    assign arlen_o    = 4'd1;   // two beats
 
     assign awid_o     = 4'd0;
     assign awsize_o   = 3'b010;
@@ -286,29 +282,24 @@ module MPDMAC_ENGINE
     assign wid_o      = 4'd0;
     assign wstrb_o    = 4'hF;
 
-    // AR address selection per state
-    assign arvalid_o  = (state==S_RD0_AR) || (state==S_RD1_AR) || (state==S_RD2_AR) || (state==S_RD3_AR);
-    assign araddr_o   = (state==S_RD0_AR) ? src_addr00 :
-                        (state==S_RD1_AR) ? src_addr01 :
-                        (state==S_RD2_AR) ? src_addr10 :
-                        src_addr11;
+    assign arvalid_o  = (state==S_AR);
+    assign araddr_o   = (ar_cnt==0) ? src_addr0 : src_addr1;
 
-    // R handshake
-    assign rready_o   = (state==S_RD0_R) || (state==S_RD1_R) || (state==S_RD2_R) || (state==S_RD3_R);
+    assign rready_o   = (state==S_R);
 
-    // AW address per state
-    assign awvalid_o  = (state==S_AW0) || (state==S_AW1);
-    assign awaddr_o   = (state==S_AW0) ? dst_addr0 : dst_addr1;
+    assign awvalid_o  = (state==S_AW);
+    assign awaddr_o   = (aw_cnt==0) ? dst_addr0 : dst_addr1;
 
-    // Write data channel
-    assign wvalid_o   = (state==S_W0) || (state==S_W1);
-    assign wdata_o    = (state==S_W0) ? (beat_cnt==0 ? buffer[0][0] : buffer[0][1]) :
-                        (beat_cnt==0 ? buffer[1][0] : buffer[1][1]);
-    assign wlast_o    = (beat_cnt==1);
+    assign wvalid_o   = (state==S_W);
+    assign wdata_o    = (wr_cnt==0) ? buffer[0][0] :
+                        (wr_cnt==1) ? buffer[0][1] :
+                        (wr_cnt==2) ? buffer[1][0] :
+                                       buffer[1][1];
+    assign wlast_o    = (wr_cnt==1) || (wr_cnt==3);
 
-    // B channel
-    assign bready_o   = (state==S_B0) || (state==S_B1);
+    assign bready_o   = (state==S_B);
 
     assign done_o     = done;
+
 
 endmodule
