@@ -71,19 +71,17 @@ module MPDMAC_ENGINE
     reg [5:0]  mat_width;
     reg        done;
     
-    // 2x2 buffer - only 4 words for area optimization
-    reg [31:0] buffer_2x2 [0:1][0:1];
+    // 2x2 buffer - exactly 4 words for area optimization
+    reg [31:0] buffer_2x2 [0:3];  // Linear array: [0]=top-left, [1]=top-right, [2]=bottom-left, [3]=bottom-right
     
-    // Block position in output matrix (in 2x2 block units)
-    reg [5:0]  block_row;
-    reg [5:0]  block_col;
-    
-    // Total blocks in each dimension
-    wire [5:0] total_blocks = (mat_width + 2 + 1) / 2;  // (N+2)/2 rounded up
+    // Current 2x2 block position in output matrix (padded coordinates)
+    reg [5:0]  out_row;     // Current output row (0 to mat_width+1, step by 2)
+    reg [5:0]  out_col;     // Current output column (0 to mat_width+1, step by 2)
     
     // AXI control signals
     reg        ar_valid;
     reg [31:0] ar_addr;
+    reg [3:0]  ar_len;
     reg        r_ready;
     reg [1:0]  read_cnt;
     
@@ -108,7 +106,7 @@ module MPDMAC_ENGINE
     // AXI AR channel
     assign arid_o = 4'd0;
     assign araddr_o = ar_addr;
-    assign arlen_o = 4'd3;      // Always read 4 elements for 2x2
+    assign arlen_o = ar_len;
     assign arsize_o = 3'b010;   // 4 bytes
     assign arburst_o = 2'b01;   // INCR
     assign arvalid_o = ar_valid;
@@ -130,99 +128,115 @@ module MPDMAC_ENGINE
     assign wvalid_o = w_valid;
     assign bready_o = b_ready;
     
-    // Calculate source address for a 2x2 block
-    function [31:0] calc_src_addr;
-        input [5:0] blk_row;
-        input [5:0] blk_col;
+    // Determine if 2x2 block needs reading from source memory
+    function need_read_from_source;
+        input [5:0] out_r;
+        input [5:0] out_c;
         input [5:0] width;
-        reg [5:0] src_row, src_col;
         begin
-            // Convert block coordinates to source matrix coordinates
-            src_row = blk_row * 2 - 1;  // -1 because output is padded
-            src_col = blk_col * 2 - 1;
+            // Need to read if any part of 2x2 block overlaps with original matrix
+            need_read_from_source = (out_r > 0 && out_r <= width) && 
+                                   (out_c > 0 && out_c <= width);
+        end
+    endfunction
+    
+    // Calculate read address for source matrix (always starts from top-left corner of valid area)
+    function [31:0] calc_read_addr;
+        input [5:0] out_r;
+        input [5:0] out_c;
+        input [5:0] width;
+        reg [5:0] src_r, src_c;
+        begin
+            // Start reading from top-left corner of overlapping area
+            src_r = (out_r > 0) ? (out_r - 1) : 0;
+            src_c = (out_c > 0) ? (out_c - 1) : 0;
             
-            // Clamp to valid source range [0, width-1]
-            if (src_row >= width) src_row = width - 1;
-            if (src_col >= width) src_col = width - 1;
+            // Clamp to valid source range
+            if (src_r >= width) src_r = width - 1;
+            if (src_c >= width) src_c = width - 1;
             
-            calc_src_addr = src_addr + (src_row * width + src_col) * 4;
+            calc_read_addr = src_addr + (src_r * width + src_c) * 4;
         end
     endfunction
     
-    // Calculate destination address for a 2x2 block
-    function [31:0] calc_dst_addr;
-        input [5:0] blk_row;
-        input [5:0] blk_col;
+    // Get padded value for specific position using mirror padding
+    function [31:0] get_output_value;
+        input [5:0] out_r;
+        input [5:0] out_c;
         input [5:0] width;
-        reg [5:0] dst_row, dst_col;
-        begin
-            dst_row = blk_row * 2;
-            dst_col = blk_col * 2;
-            calc_dst_addr = dst_addr + (dst_row * (width + 2) + dst_col) * 4;
-        end
-    endfunction
-    
-    // Check if we need to read from source (not in padding area)
-    function need_read;
-        input [5:0] blk_row;
-        input [5:0] blk_col;
-        input [5:0] width;
-        begin
-            // Need to read if any part of 2x2 block overlaps with source matrix
-            need_read = (blk_row * 2 < width + 1) && (blk_col * 2 < width + 1) &&
-                       (blk_row * 2 + 1 >= 1) && (blk_col * 2 + 1 >= 1);
-        end
-    endfunction
-    
-    // Get padded value for specific position in 2x2 block
-    function [31:0] get_padded_value;
-        input [5:0] blk_row;
-        input [5:0] blk_col;
-        input [5:0] width;
-        input [1:0] pos_row;  // 0 or 1 (within 2x2 block)
-        input [1:0] pos_col;  // 0 or 1 (within 2x2 block)
-        reg [5:0] out_row, out_col;
+        input [1:0] pos; // 0=top-left, 1=top-right, 2=bottom-left, 3=bottom-right
+        reg [5:0] abs_row, abs_col;
         reg [5:0] src_row, src_col;
-        reg [1:0] buf_row, buf_col;
+        reg [5:0] read_base_r, read_base_c;
+        reg [1:0] buf_idx;
         begin
             // Calculate absolute position in output matrix
-            out_row = blk_row * 2 + pos_row;
-            out_col = blk_col * 2 + pos_col;
+            case (pos)
+                2'd0: begin
+                    abs_row = out_r;
+                    abs_col = out_c;
+                end
+                2'd1: begin
+                    abs_row = out_r;
+                    abs_col = out_c + 1;
+                end
+                2'd2: begin
+                    abs_row = out_r + 1;
+                    abs_col = out_c;
+                end
+                2'd3: begin
+                    abs_row = out_r + 1;
+                    abs_col = out_c + 1;
+                end
+            endcase
             
-            // Mirror padding logic
-            if (out_row == 0) begin
-                // Top padding - mirror from row 1
+            // Apply mirror padding to get source coordinates
+            if (abs_row == 0) begin
+                // Top padding - mirror from row 1 (index 0 in source)
                 src_row = 1;
-            end else if (out_row == width + 1) begin
-                // Bottom padding - mirror from row width
+            end else if (abs_row == width + 1) begin
+                // Bottom padding - mirror from row width (index width-1 in source)
                 src_row = width;
             end else begin
-                // Normal area
-                src_row = out_row;
+                // Normal area (1-based to 0-based conversion)
+                src_row = abs_row;
             end
             
-            if (out_col == 0) begin
-                // Left padding - mirror from col 1
+            if (abs_col == 0) begin
+                // Left padding - mirror from col 1 (index 0 in source)
                 src_col = 1;
-            end else if (out_col == width + 1) begin
-                // Right padding - mirror from col width
+            end else if (abs_col == width + 1) begin
+                // Right padding - mirror from col width (index width-1 in source)
                 src_col = width;
             end else begin
-                // Normal area
-                src_col = out_col;
+                // Normal area (1-based to 0-based conversion)
+                src_col = abs_col;
             end
             
-            // Convert back to buffer coordinates
-            buf_row = src_row - (blk_row * 2 - 1);
-            buf_col = src_col - (blk_col * 2 - 1);
+            // Calculate where we read the buffer from (what was the base read position)
+            read_base_r = (out_r > 0) ? (out_r - 1) : 0;
+            read_base_c = (out_c > 0) ? (out_c - 1) : 0;
+            if (read_base_r >= width) read_base_r = width - 1;
+            if (read_base_c >= width) read_base_c = width - 1;
             
-            // Handle boundary cases for buffer indexing
-            if (buf_row > 1) buf_row = 1;
-            if (buf_col > 1) buf_col = 1;
-            if (buf_row[1]) buf_row = 0;  // Handle negative (underflow)
-            if (buf_col[1]) buf_col = 0;  // Handle negative (underflow)
+            // Map source position to buffer index based on read base
+            if (src_row == read_base_r + 1 && src_col == read_base_c + 1) buf_idx = 2'd0;     // top-left
+            else if (src_row == read_base_r + 1 && src_col == read_base_c + 2) buf_idx = 2'd1; // top-right  
+            else if (src_row == read_base_r + 2 && src_col == read_base_c + 1) buf_idx = 2'd2; // bottom-left
+            else if (src_row == read_base_r + 2 && src_col == read_base_c + 2) buf_idx = 2'd3; // bottom-right
+            else buf_idx = 2'd0; // fallback
             
-            get_padded_value = buffer_2x2[buf_row][buf_col];
+            get_output_value = buffer_2x2[buf_idx];
+        end
+    endfunction
+    
+    // Calculate destination address for 2x2 block write
+    function [31:0] calc_write_addr;
+        input [5:0] out_r;
+        input [5:0] out_c;
+        input [5:0] width;
+        begin
+            calc_write_addr = dst_addr + (out_r * (width + 2) + out_c) * 4;
         end
     endfunction
     
@@ -235,11 +249,12 @@ module MPDMAC_ENGINE
             mat_width <= 6'd0;
             done <= 1'b1;
             
-            block_row <= 6'd0;
-            block_col <= 6'd0;
+            out_row <= 6'd0;
+            out_col <= 6'd0;
             
             ar_valid <= 1'b0;
             ar_addr <= 32'd0;
+            ar_len <= 4'd0;
             r_ready <= 1'b0;
             read_cnt <= 2'd0;
             
@@ -251,10 +266,10 @@ module MPDMAC_ENGINE
             b_ready <= 1'b0;
             write_cnt <= 2'd0;
             
-            buffer_2x2[0][0] <= 32'd0;
-            buffer_2x2[0][1] <= 32'd0;
-            buffer_2x2[1][0] <= 32'd0;
-            buffer_2x2[1][1] <= 32'd0;
+            buffer_2x2[0] <= 32'd0;
+            buffer_2x2[1] <= 32'd0;
+            buffer_2x2[2] <= 32'd0;
+            buffer_2x2[3] <= 32'd0;
         end else begin
             case (state)
                 S_IDLE: begin
@@ -263,21 +278,22 @@ module MPDMAC_ENGINE
                         src_addr <= src_addr_i;
                         dst_addr <= dst_addr_i;
                         mat_width <= mat_width_i;
-                        block_row <= 6'd0;
-                        block_col <= 6'd0;
+                        out_row <= 6'd0;
+                        out_col <= 6'd0;
                         
-                        // Start processing first 2x2 block
-                        if (need_read(6'd0, 6'd0, mat_width_i)) begin
+                        // Check if first block needs reading
+                        if (need_read_from_source(6'd0, 6'd0, mat_width_i)) begin
                             state <= S_READ_2X2;
                             ar_valid <= 1'b1;
-                            ar_addr <= calc_src_addr(6'd0, 6'd0, mat_width_i);
+                            ar_addr <= calc_read_addr(6'd0, 6'd0, mat_width_i);
+                            ar_len <= 4'd3; // Read 4 elements
                             r_ready <= 1'b1;
                             read_cnt <= 2'd0;
                         end else begin
-                            // First block is all padding
+                            // All padding, use default values
                             state <= S_WRITE_BLOCK;
                             aw_valid <= 1'b1;
-                            aw_addr <= calc_dst_addr(6'd0, 6'd0, mat_width_i);
+                            aw_addr <= calc_write_addr(6'd0, 6'd0, mat_width_i);
                             write_cnt <= 2'd0;
                         end
                     end else begin
@@ -291,12 +307,7 @@ module MPDMAC_ENGINE
                     end
                     
                     if (r_handshake) begin
-                        case (read_cnt)
-                            2'd0: buffer_2x2[0][0] <= rdata_i;
-                            2'd1: buffer_2x2[0][1] <= rdata_i;
-                            2'd2: buffer_2x2[1][0] <= rdata_i;
-                            2'd3: buffer_2x2[1][1] <= rdata_i;
-                        endcase
+                        buffer_2x2[read_cnt] <= rdata_i;
                         read_cnt <= read_cnt + 1;
                         
                         if (rlast_i) begin
@@ -304,7 +315,7 @@ module MPDMAC_ENGINE
                             read_cnt <= 2'd0;
                             state <= S_WRITE_BLOCK;
                             aw_valid <= 1'b1;
-                            aw_addr <= calc_dst_addr(block_row, block_col, mat_width);
+                            aw_addr <= calc_write_addr(out_row, out_col, mat_width);
                             write_cnt <= 2'd0;
                         end
                     end
@@ -315,7 +326,7 @@ module MPDMAC_ENGINE
                         aw_valid <= 1'b0;
                         w_valid <= 1'b1;
                         b_ready <= 1'b1;
-                        w_data <= get_padded_value(block_row, block_col, mat_width, 2'd0, 2'd0);
+                        w_data <= get_output_value(out_row, out_col, mat_width, 2'd0);
                         w_last <= 1'b0;
                     end
                     
@@ -324,15 +335,15 @@ module MPDMAC_ENGINE
                         
                         case (write_cnt)
                             2'd0: begin
-                                w_data <= get_padded_value(block_row, block_col, mat_width, 2'd0, 2'd1);
+                                w_data <= get_output_value(out_row, out_col, mat_width, 2'd1);
                                 w_last <= 1'b0;
                             end
                             2'd1: begin
-                                w_data <= get_padded_value(block_row, block_col, mat_width, 2'd1, 2'd0);
+                                w_data <= get_output_value(out_row, out_col, mat_width, 2'd2);
                                 w_last <= 1'b0;
                             end
                             2'd2: begin
-                                w_data <= get_padded_value(block_row, block_col, mat_width, 2'd1, 2'd1);
+                                w_data <= get_output_value(out_row, out_col, mat_width, 2'd3);
                                 w_last <= 1'b1;
                             end
                             2'd3: begin
@@ -352,38 +363,41 @@ module MPDMAC_ENGINE
                         b_ready <= 1'b0;
                         write_cnt <= 2'd0;
                         
-                        // Move to next block
-                        if (block_col < total_blocks - 1) begin
-                            block_col <= block_col + 1;
+                        // Move to next 2x2 block
+                        if (out_col < mat_width) begin
+                            out_col <= out_col + 2;
                         end else begin
-                            block_col <= 6'd0;
-                            block_row <= block_row + 1;
+                            out_col <= 6'd0;
+                            out_row <= out_row + 2;
                         end
                         
                         // Check if done
-                        if (block_row >= total_blocks - 1 && block_col >= total_blocks - 1) begin
+                        if (out_row >= mat_width && out_col >= mat_width) begin
                             state <= S_DONE;
                         end else begin
-                            // Prepare next block
+                            // Prepare next block coordinates
                             reg [5:0] next_row, next_col;
-                            if (block_col < total_blocks - 1) begin
-                                next_row = block_row;
-                                next_col = block_col + 1;
+                            if (out_col < mat_width) begin
+                                next_row = out_row;
+                                next_col = out_col + 2;
                             end else begin
-                                next_row = block_row + 1;
+                                next_row = out_row + 2;
                                 next_col = 6'd0;
                             end
                             
-                            if (need_read(next_row, next_col, mat_width)) begin
+                            // Check if next block needs reading
+                            if (need_read_from_source(next_row, next_col, mat_width)) begin
                                 state <= S_READ_2X2;
                                 ar_valid <= 1'b1;
-                                ar_addr <= calc_src_addr(next_row, next_col, mat_width);
+                                ar_addr <= calc_read_addr(next_row, next_col, mat_width);
+                                ar_len <= 4'd3;
                                 r_ready <= 1'b1;
                                 read_cnt <= 2'd0;
                             end else begin
+                                // All padding for this block
                                 state <= S_WRITE_BLOCK;
                                 aw_valid <= 1'b1;
-                                aw_addr <= calc_dst_addr(next_row, next_col, mat_width);
+                                aw_addr <= calc_write_addr(next_row, next_col, mat_width);
                                 write_cnt <= 2'd0;
                             end
                         end
