@@ -60,9 +60,12 @@ module MPDMAC_ENGINE
     localparam S_IDLE           = 4'd0;
     localparam S_READ_3x3       = 4'd1;
     localparam S_PREPARE_BLOCK  = 4'd2;
-    localparam S_WRITE_BURST    = 4'd3;
-    localparam S_NEXT_BLOCK     = 4'd4;
-    localparam S_DONE           = 4'd5;
+    localparam S_WRITE_TL       = 4'd3;
+    localparam S_WRITE_TR       = 4'd4;
+    localparam S_WRITE_BL       = 4'd5;
+    localparam S_WRITE_BR       = 4'd6;
+    localparam S_NEXT_BLOCK     = 4'd7;
+    localparam S_DONE           = 4'd8;
 
     reg [3:0] state;
     
@@ -101,7 +104,6 @@ module MPDMAC_ENGINE
     reg [31:0] w_data;
     reg        w_last;
     reg        b_ready;
-    reg [1:0]  write_count;
     
     // Output data for 2x2 block
     reg [31:0] output_block [0:3];  // TL, TR, BL, BR
@@ -128,7 +130,7 @@ module MPDMAC_ENGINE
     // AXI AW channel  
     assign awid_o = 4'd0;
     assign awaddr_o = aw_addr;
-    assign awlen_o = 4'd3;      // 4 transfers (2x2 block)
+    assign awlen_o = 4'd0;      // Single write transaction
     assign awsize_o = 3'b010;   // 4 bytes
     assign awburst_o = 2'b01;   // INCR
     assign awvalid_o = aw_valid;
@@ -141,8 +143,8 @@ module MPDMAC_ENGINE
     assign wvalid_o = w_valid;
     assign bready_o = b_ready;
     
-    // 3x3 버퍼에서 미러 패딩된 값 계산
-    function [31:0] get_mirrored_value;
+    // 미러 패딩된 주소 계산
+    function [31:0] get_mirrored_addr;
         input signed [6:0] src_r;  // 1-based source row
         input signed [6:0] src_c;  // 1-based source col
         input [5:0] width;
@@ -165,9 +167,8 @@ module MPDMAC_ENGINE
                 mirrored_c = src_c;  // Normal region
             end
             
-            // Return the mirrored coordinates (for address calculation)
-            // We'll use this for reading from source matrix
-            get_mirrored_value = ((mirrored_r - 1) * width + (mirrored_c - 1)) * 4;  // Address offset
+            // Return address offset from source base
+            get_mirrored_addr = ((mirrored_r - 1) * width + (mirrored_c - 1)) * 4;
         end
     endfunction
     
@@ -220,6 +221,17 @@ module MPDMAC_ENGINE
         end
     endfunction
     
+    // 출력 매트릭스 주소 계산
+    function [31:0] calc_output_addr;
+        input [5:0] out_r;  // 0-based output row
+        input [5:0] out_c;  // 0-based output col
+        input [5:0] width;
+        begin
+            // Output matrix size: (width+2) x (width+2)
+            calc_output_addr = dst_addr + (out_r * (width + 2) + out_c) * 4;
+        end
+    endfunction
+    
     // Main state machine
     always @(posedge clk) begin
         if (!rst_n) begin
@@ -235,7 +247,7 @@ module MPDMAC_ENGINE
             center_col <= 7'd0;
             
             read_count <= 4'd0;
-            read_needed <= 4'd9;  // Read 3x3 = 9 elements
+            read_needed <= 4'd9;
             reading_active <= 1'b0;
             
             ar_valid <= 1'b0;
@@ -248,7 +260,6 @@ module MPDMAC_ENGINE
             w_data <= 32'd0;
             w_last <= 1'b0;
             b_ready <= 1'b0;
-            write_count <= 2'd0;
         end else begin
             case (state)
                 S_IDLE: begin
@@ -266,7 +277,7 @@ module MPDMAC_ENGINE
                         
                         state <= S_READ_3x3;
                         read_count <= 4'd0;
-                        read_needed <= 4'd9;  // Read 3x3 = 9 elements
+                        read_needed <= 4'd9;
                         reading_active <= 1'b0;
                     end else begin
                         done <= 1'b1;
@@ -284,7 +295,7 @@ module MPDMAC_ENGINE
                         target_c = center_col - 1 + (read_count % 3);
                         
                         // Calculate read address with mirroring
-                        read_addr_offset = get_mirrored_value(target_r, target_c, mat_width);
+                        read_addr_offset = get_mirrored_addr(target_r, target_c, mat_width);
                         
                         ar_valid <= 1'b1;
                         ar_addr <= src_addr + read_addr_offset;
@@ -317,44 +328,97 @@ module MPDMAC_ENGINE
                     output_block[2] <= calc_output_value(block_row + 1, block_col, mat_width);     // BL
                     output_block[3] <= calc_output_value(block_row + 1, block_col + 1, mat_width); // BR
                     
-                    state <= S_WRITE_BURST;
-                    write_count <= 2'd0;
+                    state <= S_WRITE_TL;
                     
-                    // Start write transaction for 2x2 block
+                    // Start write transaction for TL
                     aw_valid <= 1'b1;
-                    aw_addr <= dst_addr + (block_row * (mat_width + 2) + block_col) * 4;  // TL address
+                    aw_addr <= calc_output_addr(block_row, block_col, mat_width);  // TL address
                 end
                 
-                S_WRITE_BURST: begin
+                S_WRITE_TL: begin
                     if (aw_handshake) begin
                         aw_valid <= 1'b0;
                         w_valid <= 1'b1;
-                        w_data <= output_block[0];  // Start with TL
-                        w_last <= 1'b0;
+                        w_data <= output_block[0];  // TL
+                        w_last <= 1'b1;
                         b_ready <= 1'b1;
                     end
                     
                     if (w_handshake) begin
-                        write_count <= write_count + 1;
+                        w_valid <= 1'b0;
+                        w_last <= 1'b0;
+                    end
+                    
+                    if (b_handshake) begin
+                        b_ready <= 1'b0;
+                        state <= S_WRITE_TR;
                         
-                        case (write_count)
-                            2'd0: begin  // Just sent TL, now send TR
-                                w_data <= output_block[1];
-                                w_last <= 1'b0;
-                            end
-                            2'd1: begin  // Just sent TR, now send BL
-                                w_data <= output_block[2];
-                                w_last <= 1'b0;
-                            end
-                            2'd2: begin  // Just sent BL, now send BR
-                                w_data <= output_block[3];
-                                w_last <= 1'b1;  // Last transfer
-                            end
-                            2'd3: begin  // Just sent BR
-                                w_valid <= 1'b0;
-                                w_last <= 1'b0;
-                            end
-                        endcase
+                        // Start write transaction for TR
+                        aw_valid <= 1'b1;
+                        aw_addr <= calc_output_addr(block_row, block_col + 1, mat_width);  // TR address
+                    end
+                end
+                
+                S_WRITE_TR: begin
+                    if (aw_handshake) begin
+                        aw_valid <= 1'b0;
+                        w_valid <= 1'b1;
+                        w_data <= output_block[1];  // TR
+                        w_last <= 1'b1;
+                        b_ready <= 1'b1;
+                    end
+                    
+                    if (w_handshake) begin
+                        w_valid <= 1'b0;
+                        w_last <= 1'b0;
+                    end
+                    
+                    if (b_handshake) begin
+                        b_ready <= 1'b0;
+                        state <= S_WRITE_BL;
+                        
+                        // Start write transaction for BL
+                        aw_valid <= 1'b1;
+                        aw_addr <= calc_output_addr(block_row + 1, block_col, mat_width);  // BL address
+                    end
+                end
+                
+                S_WRITE_BL: begin
+                    if (aw_handshake) begin
+                        aw_valid <= 1'b0;
+                        w_valid <= 1'b1;
+                        w_data <= output_block[2];  // BL
+                        w_last <= 1'b1;
+                        b_ready <= 1'b1;
+                    end
+                    
+                    if (w_handshake) begin
+                        w_valid <= 1'b0;
+                        w_last <= 1'b0;
+                    end
+                    
+                    if (b_handshake) begin
+                        b_ready <= 1'b0;
+                        state <= S_WRITE_BR;
+                        
+                        // Start write transaction for BR
+                        aw_valid <= 1'b1;
+                        aw_addr <= calc_output_addr(block_row + 1, block_col + 1, mat_width);  // BR address
+                    end
+                end
+                
+                S_WRITE_BR: begin
+                    if (aw_handshake) begin
+                        aw_valid <= 1'b0;
+                        w_valid <= 1'b1;
+                        w_data <= output_block[3];  // BR
+                        w_last <= 1'b1;
+                        b_ready <= 1'b1;
+                    end
+                    
+                    if (w_handshake) begin
+                        w_valid <= 1'b0;
+                        w_last <= 1'b0;
                     end
                     
                     if (b_handshake) begin
