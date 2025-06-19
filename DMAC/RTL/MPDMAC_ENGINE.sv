@@ -55,37 +55,65 @@ module MPDMAC_ENGINE
     input   wire                        rvalid_i,
     output  wire                        rready_o
 );
+    // Design here
 
     // ----------------------------------------------------------
-    // Internal registers
+    // Parameters and internal signals
     // ----------------------------------------------------------
-    typedef enum logic [2:0] {
-        S_IDLE,
-        S_AR,
-        S_R,
-        S_AW,
-        S_W,
-        S_B
+
+    typedef enum logic [3:0] {
+        S_IDLE      = 4'd0,
+        S_RD0_AR    = 4'd1,
+        S_RD0_R     = 4'd2,
+        S_RD1_AR    = 4'd3,
+        S_RD1_R     = 4'd4,
+        S_RD2_AR    = 4'd5,
+        S_RD2_R     = 4'd6,
+        S_RD3_AR    = 4'd7,
+        S_RD3_R     = 4'd8,
+        S_AW0       = 4'd9,
+        S_W0        = 4'd10,
+        S_B0        = 4'd11,
+        S_AW1       = 4'd12,
+        S_W1        = 4'd13,
+        S_B1        = 4'd14
     } state_t;
 
-    state_t             state, state_n;
-    reg [31:0]          src_base, dst_base;
-    reg [5:0]           mat_width;
-    reg [5:0]           pad_width;
+    state_t                  state, state_n;
 
-    reg [5:0]           row, row_n;
-    reg [5:0]           col, col_n;
+    reg [31:0]               src_base, dst_base;
+    reg [5:0]                mat_width;
+    reg [5:0]                pad_width;
 
-    reg [31:0]          rdata_buf;
-    reg                 done, done_n;
+    reg [5:0]                row, col;
+    reg [5:0]                row_n, col_n;
+
+    reg [31:0]               buffer[1:0][1:0];
+    reg [1:0]                beat_cnt;
+    reg [31:0]               axi_addr;
+
+    reg                      done, done_n;
 
     // ----------------------------------------------------------
-    // Start logic
+    // Helper function for mirror index
     // ----------------------------------------------------------
-    wire start_trig = start_i & done;
+    function automatic [5:0] mirror_idx(
+        input [5:0] pidx,
+        input [5:0] pad_w,
+        input [5:0] mat_w
+    );
+        if (pidx == 0)
+            mirror_idx = 6'd1;
+        else if (pidx == pad_w - 1)
+            mirror_idx = mat_w - 2;
+        else
+            mirror_idx = pidx - 1;
+    endfunction
+
+    wire        start_trig = start_i & done;
 
     // ----------------------------------------------------------
-    // FSM sequential
+    // sequential logic
     // ----------------------------------------------------------
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -96,85 +124,146 @@ module MPDMAC_ENGINE
             pad_width   <= 6'd0;
             row         <= 6'd0;
             col         <= 6'd0;
-            rdata_buf   <= 32'd0;
+            beat_cnt    <= 2'd0;
+            axi_addr    <= 32'd0;
+            buffer[0][0]<= 32'd0;
+            buffer[0][1]<= 32'd0;
+            buffer[1][0]<= 32'd0;
+            buffer[1][1]<= 32'd0;
             done        <= 1'b1;
         end else begin
             state       <= state_n;
-            src_base    <= (start_trig) ? src_addr_i : src_base;
-            dst_base    <= (start_trig) ? dst_addr_i : dst_base;
-            mat_width   <= (start_trig) ? mat_width_i : mat_width;
-            pad_width   <= (start_trig) ? (mat_width_i + 6'd2) : pad_width;
             row         <= row_n;
             col         <= col_n;
-            if (state==S_R && rvalid_i)
-                rdata_buf <= rdata_i;
+            beat_cnt    <= (state==S_W0 || state==S_W1 || state==S_RD0_R || state==S_RD1_R || state==S_RD2_R || state==S_RD3_R) ? beat_cnt + 1'b1 : 2'd0;
+            axi_addr    <= (state==S_RD0_AR || state==S_RD1_AR || state==S_RD2_AR || state==S_RD3_AR || state==S_AW0 || state==S_AW1) ? axi_addr : axi_addr;
+            if (state==S_RD0_R && rvalid_i)      buffer[0][0] <= rdata_i;
+            if (state==S_RD1_R && rvalid_i)      buffer[0][1] <= rdata_i;
+            if (state==S_RD2_R && rvalid_i)      buffer[1][0] <= rdata_i;
+            if (state==S_RD3_R && rvalid_i)      buffer[1][1] <= rdata_i;
             done        <= done_n;
         end
     end
 
     // ----------------------------------------------------------
-    // Address calculations
+    // address generation
     // ----------------------------------------------------------
-    wire [5:0] src_row = (row==0) ? 6'd1 : (row==pad_width-1) ? (mat_width-2) : (row-1);
-    wire [5:0] src_col = (col==0) ? 6'd1 : (col==pad_width-1) ? (mat_width-2) : (col-1);
+    wire [5:0] src_r0 = mirror_idx(row    , pad_width, mat_width);
+    wire [5:0] src_r1 = mirror_idx(row+1 , pad_width, mat_width);
+    wire [5:0] src_c0 = mirror_idx(col    , pad_width, mat_width);
+    wire [5:0] src_c1 = mirror_idx(col+1 , pad_width, mat_width);
 
-    wire [10:0] src_idx  = src_row * mat_width + src_col;
-    wire [31:0] araddr   = src_base + (src_idx << 2);
+    wire [31:0] src_addr00 = src_base + (((src_r0 * mat_width) + src_c0) << 2);
+    wire [31:0] src_addr01 = src_base + (((src_r0 * mat_width) + src_c1) << 2);
+    wire [31:0] src_addr10 = src_base + (((src_r1 * mat_width) + src_c0) << 2);
+    wire [31:0] src_addr11 = src_base + (((src_r1 * mat_width) + src_c1) << 2);
 
-    wire [10:0] dst_idx  = row * pad_width + col;
-    wire [31:0] awaddr   = dst_base + (dst_idx << 2);
+    wire [31:0] dst_addr0  = dst_base + (((row   * pad_width) + col) << 2);
+    wire [31:0] dst_addr1  = dst_base + ((((row+1) * pad_width) + col) << 2);
 
     // ----------------------------------------------------------
-    // FSM combinational
+    // combinational FSM
     // ----------------------------------------------------------
     always_comb begin
-        state_n     = state;
-        row_n       = row;
-        col_n       = col;
-        done_n      = done;
+        state_n   = state;
+        row_n     = row;
+        col_n     = col;
+        done_n    = done;
 
         case (state)
             S_IDLE: begin
                 if (start_trig) begin
-                    state_n = S_AR;
+                    state_n = S_RD0_AR;
                     row_n   = 6'd0;
                     col_n   = 6'd0;
                     done_n  = 1'b0;
                 end
             end
-            S_AR: begin
+
+            // read four source words
+            S_RD0_AR: begin
                 if (arready_i) begin
-                    state_n = S_R;
+                    state_n = S_RD0_R;
                 end
             end
-            S_R: begin
+            S_RD0_R: begin
                 if (rvalid_i) begin
-                    state_n = S_AW;
+                    state_n = S_RD1_AR;
                 end
             end
-            S_AW: begin
+            S_RD1_AR: begin
+                if (arready_i) begin
+                    state_n = S_RD1_R;
+                end
+            end
+            S_RD1_R: begin
+                if (rvalid_i) begin
+                    state_n = S_RD2_AR;
+                end
+            end
+            S_RD2_AR: begin
+                if (arready_i) begin
+                    state_n = S_RD2_R;
+                end
+            end
+            S_RD2_R: begin
+                if (rvalid_i) begin
+                    state_n = S_RD3_AR;
+                end
+            end
+            S_RD3_AR: begin
+                if (arready_i) begin
+                    state_n = S_RD3_R;
+                end
+            end
+            S_RD3_R: begin
+                if (rvalid_i) begin
+                    state_n = S_AW0;
+                end
+            end
+
+            // write first row (2-beat burst)
+            S_AW0: begin
                 if (awready_i) begin
-                    state_n = S_W;
+                    state_n = S_W0;
                 end
             end
-            S_W: begin
-                if (wready_i) begin
-                    state_n = S_B;
+            S_W0: begin
+                if (wready_i && beat_cnt==1) begin
+                    state_n = S_B0;
                 end
             end
-            S_B: begin
+            S_B0: begin
                 if (bvalid_i) begin
-                    if (row==pad_width-1 && col==pad_width-1) begin
+                    state_n = S_AW1;
+                end
+            end
+
+            // write second row (2-beat burst)
+            S_AW1: begin
+                if (awready_i) begin
+                    state_n = S_W1;
+                end
+            end
+            S_W1: begin
+                if (wready_i && beat_cnt==1) begin
+                    state_n = S_B1;
+                end
+            end
+            S_B1: begin
+                if (bvalid_i) begin
+                    if (row == pad_width-2 && col == pad_width-2) begin
                         state_n = S_IDLE;
                         done_n  = 1'b1;
                     end else begin
-                        state_n = S_AR;
-                        if (col==pad_width-1) begin
-                            col_n = 0;
-                            row_n = row + 6'd1;
+                        // move to next tile
+                        if (col == pad_width-2) begin
+                            col_n = 6'd0;
+                            row_n = row + 6'd2;
                         end else begin
-                            col_n = col + 6'd1;
+                            col_n = col + 6'd2;
                         end
+                        state_n = S_RD0_AR;
                     end
                 end
             end
@@ -182,38 +271,44 @@ module MPDMAC_ENGINE
     end
 
     // ----------------------------------------------------------
-    // Output assignments
+    // AXI control logic
     // ----------------------------------------------------------
-    assign done_o       = done;
+    assign arid_o     = 4'd0;
+    assign arsize_o   = 3'b010; // 4 bytes
+    assign arburst_o  = 2'b01;  // INCR
+    assign arlen_o    = 4'd0;   // single beat
 
-    // AW channel
-    assign awid_o       = 4'd0;
-    assign awlen_o      = 4'd0;
-    assign awsize_o     = 3'b010;
-    assign awburst_o    = 2'b01;
-    assign awaddr_o     = awaddr;
-    assign awvalid_o    = (state==S_AW);
+    assign awid_o     = 4'd0;
+    assign awsize_o   = 3'b010;
+    assign awburst_o  = 2'b01;
+    assign awlen_o    = 4'd1;   // two beats
 
-    // W channel
-    assign wid_o        = 4'd0;
-    assign wdata_o      = rdata_buf;
-    assign wstrb_o      = 4'hF;
-    assign wlast_o      = 1'b1;
-    assign wvalid_o     = (state==S_W);
+    assign wid_o      = 4'd0;
+    assign wstrb_o    = 4'hF;
+
+    // AR address selection per state
+    assign arvalid_o  = (state==S_RD0_AR) || (state==S_RD1_AR) || (state==S_RD2_AR) || (state==S_RD3_AR);
+    assign araddr_o   = (state==S_RD0_AR) ? src_addr00 :
+                        (state==S_RD1_AR) ? src_addr01 :
+                        (state==S_RD2_AR) ? src_addr10 :
+                        src_addr11;
+
+    // R handshake
+    assign rready_o   = (state==S_RD0_R) || (state==S_RD1_R) || (state==S_RD2_R) || (state==S_RD3_R);
+
+    // AW address per state
+    assign awvalid_o  = (state==S_AW0) || (state==S_AW1);
+    assign awaddr_o   = (state==S_AW0) ? dst_addr0 : dst_addr1;
+
+    // Write data channel
+    assign wvalid_o   = (state==S_W0) || (state==S_W1);
+    assign wdata_o    = (state==S_W0) ? (beat_cnt==0 ? buffer[0][0] : buffer[0][1]) :
+                        (beat_cnt==0 ? buffer[1][0] : buffer[1][1]);
+    assign wlast_o    = (beat_cnt==1);
 
     // B channel
-    assign bready_o     = (state==S_B);
+    assign bready_o   = (state==S_B0) || (state==S_B1);
 
-    // AR channel
-    assign arid_o       = 4'd0;
-    assign arlen_o      = 4'd0;
-    assign arsize_o     = 3'b010;
-    assign arburst_o    = 2'b01;
-    assign araddr_o     = araddr;
-    assign arvalid_o    = (state==S_AR);
-
-    // R channel
-    assign rready_o     = (state==S_R);
+    assign done_o     = done;
 
 endmodule
-
