@@ -285,19 +285,19 @@ module MPDMAC_ENGINE
                         
                         // 출력 좌표를 소스 좌표로 변환 (패딩 적용)
                         if (target_out_r <= 0) begin
-                            target_src_r = 1;  // 상단 패딩: row 1에서 미러링
+                            target_src_r = 2;  // 상단 패딩: row 2에서 미러링 (1-based)
                         end else if (target_out_r >= mat_width + 1) begin
-                            target_src_r = mat_width;  // 하단 패딩: 마지막 row에서 미러링
+                            target_src_r = mat_width - 1;  // 하단 패딩: 마지막에서 두 번째 row에서 미러링
                         end else begin
-                            target_src_r = target_out_r;  // 정상 영역
+                            target_src_r = target_out_r + 1;  // 정상 영역: out_r+1이 소스 row (1-based)
                         end
                         
                         if (target_out_c <= 0) begin
-                            target_src_c = 1;  // 좌측 패딩: col 1에서 미러링
+                            target_src_c = 2;  // 좌측 패딩: col 2에서 미러링 (1-based)
                         end else if (target_out_c >= mat_width + 1) begin
-                            target_src_c = mat_width;  // 우측 패딩: 마지막 col에서 미러링
+                            target_src_c = mat_width - 1;  // 우측 패딩: 마지막에서 두 번째 col에서 미러링
                         end else begin
-                            target_src_c = target_out_c;  // 정상 영역
+                            target_src_c = target_out_c + 1;  // 정상 영역: out_c+1이 소스 col (1-based)
                         end
                         
                         // Calculate read address
