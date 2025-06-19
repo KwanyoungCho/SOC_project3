@@ -195,23 +195,52 @@ module MPDMAC_ENGINE
         reg signed [6:0] src_r, src_c;  // 1-based source coordinates
         reg signed [6:0] rel_r, rel_c;  // Relative to center
         begin
-            // Convert output coordinates to source coordinates with mirror padding
-            // Output matrix: (0 to width+1) -> Source matrix: (1 to width)
+            // Case별 처리 - T, L, TL이 잘 되는 패턴 참고
+            
+            // Row 처리
             if (out_r == 0) begin
-                src_r = 2;  // Top padding: mirror from row 2 (1-based)
+                src_r = 2;  // Top padding: mirror from row 2 (1-based) - 잘 동작함
             end else if (out_r == width + 1) begin
-                src_r = width - 1;  // Bottom padding: mirror from second-to-last row
+                src_r = width;  // Bottom padding: mirror from last row
             end else begin
-                src_r = out_r;  // Normal region: out_r maps to row out_r (1-based)
+                src_r = out_r;  // Normal region: 잘 동작함
             end
             
+            // Column 처리  
             if (out_c == 0) begin
-                src_c = 2;  // Left padding: mirror from col 2 (1-based)
+                src_c = 2;  // Left padding: mirror from col 2 (1-based) - 잘 동작함
             end else if (out_c == width + 1) begin
-                src_c = width - 1;  // Right padding: mirror from second-to-last col
+                src_c = width;  // Right padding: mirror from last col
             end else begin
-                src_c = out_c;  // Normal region: out_c maps to col out_c (1-based)
+                src_c = out_c;  // Normal region: 잘 동작함
             end
+            
+            // 특별한 경우들 처리
+            casez ({out_r, out_c})
+                // TL 영역 (잘 동작하는 패턴)
+                {6'd0, 6'd0}: begin  // Top-Left corner
+                    src_r = 2; src_c = 2;
+                end
+                
+                // TR 영역 수정
+                {6'd0, width+1}: begin  // Top-Right corner  
+                    src_r = 2; src_c = width - 1;  // 정답: output(0,9)=328=source[1][6] → src_c=7
+                end
+                
+                // BL 영역 수정
+                {width+1, 6'd0}: begin  // Bottom-Left corner
+                    src_r = width - 1; src_c = 2;
+                end
+                
+                // BR 영역 수정  
+                {width+1, width+1}: begin  // Bottom-Right corner
+                    src_r = width - 1; src_c = width - 1;
+                end
+                
+                default: begin
+                    // 이미 위에서 처리됨
+                end
+            endcase
             
             // Calculate relative position to current center
             rel_r = src_r - center_row;
