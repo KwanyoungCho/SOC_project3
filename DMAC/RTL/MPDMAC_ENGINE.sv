@@ -58,7 +58,7 @@ module MPDMAC_ENGINE
 
     // State Machine
     localparam S_IDLE           = 3'd0;
-    localparam S_READ_BLOCK     = 3'd1;
+    localparam S_READ_ROW       = 3'd1;
     localparam S_WRITE_2X2      = 3'd2;
     localparam S_WRITE_RESP     = 3'd3;
     localparam S_DONE           = 3'd4;
@@ -72,19 +72,23 @@ module MPDMAC_ENGINE
     reg        done;
     
     // Current position in output matrix (0-based)
-    reg [5:0]  out_row;     // Current output row (0 to mat_width+1)  
-    reg [5:0]  out_col;     // Current output column (0 to mat_width+1)
+    reg [5:0]  out_row;     
+    reg [5:0]  out_col;     
     
-    // Source reading buffer (최대 4개의 원소를 읽을 수 있음)
-    reg [31:0] src_buffer [0:3];
-    reg [1:0]  src_read_cnt;
-    reg [3:0]  src_read_len;  // 실제로 읽어야 할 원소 개수
+    // Source data cache - store 2 rows at most
+    reg [31:0] src_row0 [0:63];  // Current row
+    reg [31:0] src_row1 [0:63];  // Next row
+    reg        row0_valid;
+    reg        row1_valid;
+    reg [5:0]  cached_row;       // Which source row is cached in row0
     
     // AXI control signals
     reg        ar_valid;
     reg [31:0] ar_addr;
-    reg [3:0]  ar_len;
+    reg [5:0]  ar_len;
     reg        r_ready;
+    reg [5:0]  read_cnt;
+    reg        reading_row1;
     
     reg        aw_valid;
     reg [31:0] aw_addr;
@@ -107,7 +111,7 @@ module MPDMAC_ENGINE
     // AXI AR channel
     assign arid_o = 4'd0;
     assign araddr_o = ar_addr;
-    assign arlen_o = ar_len;
+    assign arlen_o = ar_len[3:0];
     assign arsize_o = 3'b010;   // 4 bytes
     assign arburst_o = 2'b01;   // INCR
     assign arvalid_o = ar_valid;
@@ -129,109 +133,78 @@ module MPDMAC_ENGINE
     assign wvalid_o = w_valid;
     assign bready_o = b_ready;
     
-    // 현재 2x2 블록이 원본 매트릭스와 겹치는지 확인
-    function need_source_read;
+    // 현재 2x2 블록에 필요한 소스 행들이 캐시되어 있는지 확인
+    function need_read_source;
         input [5:0] out_r;
         input [5:0] out_c;
         input [5:0] width;
+        reg [5:0] src_r0, src_r1;
         begin
-            // 2x2 블록이 원본 영역(1~width, 1~width)과 겹치는지 확인
-            need_source_read = ((out_r + 1 >= 1) && (out_r <= width)) && 
-                              ((out_c + 1 >= 1) && (out_c <= width));
+            // 출력 위치에 대응되는 소스 행 계산 (미러 패딩 적용)
+            src_r0 = get_source_row(out_r, width);
+            src_r1 = get_source_row(out_r + 1, width);
+            
+            // 필요한 행들이 캐시되어 있지 않으면 읽기 필요
+            need_read_source = (!row0_valid || cached_row != src_r0) || 
+                              (!row1_valid || cached_row + 1 != src_r1);
         end
     endfunction
     
-    // 읽어야 할 원소의 개수와 시작 주소 계산
-    function [4:0] calc_read_info; // [4] = need_read, [3:0] = length
+    // 출력 좌표를 소스 행으로 변환 (미러 패딩 적용)
+    function [5:0] get_source_row;
         input [5:0] out_r;
-        input [5:0] out_c;
         input [5:0] width;
-        reg [5:0] src_start_r, src_start_c;
-        reg [5:0] src_end_r, src_end_c;
-        reg [5:0] read_rows, read_cols;
         begin
-            if (!need_source_read(out_r, out_c, width)) begin
-                calc_read_info = 5'b0_0000; // no read needed
+            if (out_r == 0) begin
+                get_source_row = 1;  // 상단 패딩: row 1에서 미러
+            end else if (out_r == width + 1) begin
+                get_source_row = width;  // 하단 패딩: row width에서 미러
             end else begin
-                // 읽기 시작점 (원본 매트릭스 내에서)
-                src_start_r = (out_r >= 1) ? out_r : 1;
-                src_start_c = (out_c >= 1) ? out_c : 1;
-                
-                // 읽기 끝점 (원본 매트릭스 내에서)  
-                src_end_r = ((out_r + 1) <= width) ? (out_r + 1) : width;
-                src_end_c = ((out_c + 1) <= width) ? (out_c + 1) : width;
-                
-                read_rows = src_end_r - src_start_r + 1;
-                read_cols = src_end_c - src_start_c + 1;
-                
-                calc_read_info = {1'b1, read_rows[1:0], read_cols[1:0]};
+                get_source_row = out_r;  // 일반 영역: 그대로 사용
             end
         end
     endfunction
     
-    // 읽기 주소 계산
-    function [31:0] calc_read_addr;
-        input [5:0] out_r;
+    // 출력 좌표를 소스 열로 변환 (미러 패딩 적용)  
+    function [5:0] get_source_col;
         input [5:0] out_c;
         input [5:0] width;
-        reg [5:0] src_r, src_c;
         begin
-            src_r = (out_r >= 1) ? out_r : 1;
-            src_c = (out_c >= 1) ? out_c : 1;
-            
-            // 0-based indexing for memory address
-            calc_read_addr = src_addr + ((src_r - 1) * width + (src_c - 1)) * 4;
+            if (out_c == 0) begin
+                get_source_col = 1;  // 좌측 패딩: col 1에서 미러
+            end else if (out_c == width + 1) begin
+                get_source_col = width;  // 우측 패딩: col width에서 미러
+            end else begin
+                get_source_col = out_c;  // 일반 영역: 그대로 사용
+            end
         end
     endfunction
     
-    // 미러 패딩을 적용한 값 가져오기
+    // 2x2 블록의 특정 위치에서 미러 패딩된 값 가져오기
     function [31:0] get_padded_value;
-        input [5:0] out_r;      // Output matrix row (0-based)
-        input [5:0] out_c;      // Output matrix col (0-based)  
+        input [5:0] out_r;
+        input [5:0] out_c;
         input [5:0] width;
-        input [1:0] rel_r;      // Relative position in 2x2 (0 or 1)
-        input [1:0] rel_c;      // Relative position in 2x2 (0 or 1)
-        reg [5:0] abs_r, abs_c; // Absolute position in output matrix
-        reg [5:0] src_r, src_c; // Corresponding source position (1-based)
-        reg [5:0] buf_r, buf_c; // Buffer index calculation
-        reg [1:0] buf_idx;
+        input [1:0] rel_r;  // 2x2 블록 내 상대 행 (0 or 1)
+        input [1:0] rel_c;  // 2x2 블록 내 상대 열 (0 or 1)
+        reg [5:0] abs_r, abs_c;
+        reg [5:0] src_r, src_c;
         begin
-            // Calculate absolute position in output matrix
+            // 절대 출력 좌표 계산
             abs_r = out_r + rel_r;
             abs_c = out_c + rel_c;
             
-            // Apply mirror padding to get source coordinates (1-based)
-            if (abs_r == 0) begin
-                src_r = 1;  // Mirror from first row
-            end else if (abs_r == width + 1) begin
-                src_r = width;  // Mirror from last row
-            end else begin
-                src_r = abs_r;  // Normal case (already 1-based for source)
-            end
+            // 미러 패딩 적용하여 소스 좌표 계산
+            src_r = get_source_row(abs_r, width);
+            src_c = get_source_col(abs_c, width);
             
-            if (abs_c == 0) begin
-                src_c = 1;  // Mirror from first column
-            end else if (abs_c == width + 1) begin
-                src_c = width;  // Mirror from last column
+            // 캐시에서 값 가져오기
+            if (src_r == cached_row) begin
+                get_padded_value = src_row0[src_c - 1];  // 0-based indexing for array
+            end else if (src_r == cached_row + 1) begin
+                get_padded_value = src_row1[src_c - 1];  // 0-based indexing for array
             end else begin
-                src_c = abs_c;  // Normal case (already 1-based for source)
-            end
-            
-            // Check if we read this from source
-            if (need_source_read(out_r, out_c, width)) begin
-                // Calculate buffer position based on what we actually read
-                reg [5:0] read_start_r, read_start_c;
-                read_start_r = (out_r >= 1) ? out_r : 1;
-                read_start_c = (out_c >= 1) ? out_c : 1;
-                
-                buf_r = src_r - read_start_r;
-                buf_c = src_c - read_start_c;
-                buf_idx = buf_r * 2 + buf_c;
-                
-                get_padded_value = src_buffer[buf_idx];
-            end else begin
-                // All padding case - use a default value (should not happen in practice)
-                get_padded_value = 32'd0;
+                get_padded_value = 32'd0;  // Error case
             end
         end
     endfunction
@@ -257,13 +230,16 @@ module MPDMAC_ENGINE
             
             out_row <= 6'd0;
             out_col <= 6'd0;
+            row0_valid <= 1'b0;
+            row1_valid <= 1'b0;
+            cached_row <= 6'd0;
             
             ar_valid <= 1'b0;
             ar_addr <= 32'd0;
-            ar_len <= 4'd0;
+            ar_len <= 6'd0;
             r_ready <= 1'b0;
-            src_read_cnt <= 2'd0;
-            src_read_len <= 4'd0;
+            read_cnt <= 6'd0;
+            reading_row1 <= 1'b0;
             
             aw_valid <= 1'b0;
             aw_addr <= 32'd0;
@@ -272,11 +248,6 @@ module MPDMAC_ENGINE
             w_last <= 1'b0;
             b_ready <= 1'b0;
             write_cnt <= 2'd0;
-            
-            src_buffer[0] <= 32'd0;
-            src_buffer[1] <= 32'd0;
-            src_buffer[2] <= 32'd0;
-            src_buffer[3] <= 32'd0;
         end else begin
             case (state)
                 S_IDLE: begin
@@ -287,46 +258,66 @@ module MPDMAC_ENGINE
                         mat_width <= mat_width_i;
                         out_row <= 6'd0;
                         out_col <= 6'd0;
+                        row0_valid <= 1'b0;
+                        row1_valid <= 1'b0;
                         
-                        // Check if first block needs reading
-                        if (need_source_read(6'd0, 6'd0, mat_width_i)) begin
-                            reg [4:0] read_info;
-                            read_info = calc_read_info(6'd0, 6'd0, mat_width_i);
-                            state <= S_READ_BLOCK;
-                            ar_valid <= 1'b1;
-                            ar_addr <= calc_read_addr(6'd0, 6'd0, mat_width_i);
-                            ar_len <= read_info[2:0] - 1; // AXI length is actual-1
-                            src_read_len <= read_info[3:0];
-                            r_ready <= 1'b1;
-                            src_read_cnt <= 2'd0;
-                        end else begin
-                            // All padding
-                            state <= S_WRITE_2X2;
-                            aw_valid <= 1'b1;
-                            aw_addr <= calc_write_addr(6'd0, 6'd0, mat_width_i);
-                            write_cnt <= 2'd0;
-                        end
+                        // 첫 번째 블록을 위해 첫 두 행 읽기 시작
+                        state <= S_READ_ROW;
+                        ar_valid <= 1'b1;
+                        ar_addr <= src_addr_i;  // 소스 매트릭스 첫 번째 행
+                        ar_len <= mat_width_i - 1;  // AXI length = actual - 1
+                        r_ready <= 1'b1;
+                        read_cnt <= 6'd0;
+                        reading_row1 <= 1'b0;
+                        cached_row <= 6'd1;  // 읽고 있는 소스 행 번호 (1-based)
                     end else begin
                         done <= 1'b1;
                     end
                 end
                 
-                S_READ_BLOCK: begin
+                S_READ_ROW: begin
                     if (ar_handshake) begin
                         ar_valid <= 1'b0;
                     end
                     
                     if (r_handshake) begin
-                        src_buffer[src_read_cnt] <= rdata_i;
-                        src_read_cnt <= src_read_cnt + 1;
+                        if (!reading_row1) begin
+                            src_row0[read_cnt] <= rdata_i;
+                        end else begin
+                            src_row1[read_cnt] <= rdata_i;
+                        end
+                        read_cnt <= read_cnt + 1;
                         
-                        if (rlast_i || (src_read_cnt + 1 == src_read_len)) begin
-                            r_ready <= 1'b0;
-                            src_read_cnt <= 2'd0;
-                            state <= S_WRITE_2X2;
-                            aw_valid <= 1'b1;
-                            aw_addr <= calc_write_addr(out_row, out_col, mat_width);
-                            write_cnt <= 2'd0;
+                        if (rlast_i) begin
+                            if (!reading_row1) begin
+                                // 첫 번째 행 읽기 완료, 두 번째 행 읽기 시작
+                                row0_valid <= 1'b1;
+                                reading_row1 <= 1'b1;
+                                read_cnt <= 6'd0;
+                                
+                                if (cached_row < mat_width) begin
+                                    ar_valid <= 1'b1;
+                                    ar_addr <= src_addr + cached_row * mat_width * 4;  // 다음 행
+                                    ar_len <= mat_width - 1;
+                                end else begin
+                                    // 마지막 행이므로 두 번째 행 읽기 생략
+                                    row1_valid <= 1'b0;
+                                    state <= S_WRITE_2X2;
+                                    aw_valid <= 1'b1;
+                                    aw_addr <= calc_write_addr(out_row, out_col, mat_width);
+                                    write_cnt <= 2'd0;
+                                end
+                            end else begin
+                                // 두 번째 행 읽기 완료
+                                row1_valid <= 1'b1;
+                                reading_row1 <= 1'b0;
+                                r_ready <= 1'b0;
+                                read_cnt <= 6'd0;
+                                state <= S_WRITE_2X2;
+                                aw_valid <= 1'b1;
+                                aw_addr <= calc_write_addr(out_row, out_col, mat_width);
+                                write_cnt <= 2'd0;
+                            end
                         end
                     end
                 end
@@ -382,7 +373,7 @@ module MPDMAC_ENGINE
                         end
                         
                         // Check if done
-                        if (out_row + 2 >= mat_width + 2) begin
+                        if ((out_row + 2 >= mat_width + 2) && (out_col + 2 >= mat_width + 2)) begin
                             state <= S_DONE;
                         end else begin
                             // Prepare next block coordinates
@@ -395,19 +386,38 @@ module MPDMAC_ENGINE
                                 next_col = 6'd0;
                             end
                             
-                            // Check if next block needs reading
-                            if (need_source_read(next_row, next_col, mat_width)) begin
-                                reg [4:0] next_read_info;
-                                next_read_info = calc_read_info(next_row, next_col, mat_width);
-                                state <= S_READ_BLOCK;
+                            // Check if we need to read more source data
+                            if (need_read_source(next_row, next_col, mat_width)) begin
+                                reg [5:0] req_row;
+                                req_row = get_source_row(next_row, mat_width);
+                                
+                                state <= S_READ_ROW;
+                                
+                                // Shift cache if needed
+                                if (req_row == cached_row + 1) begin
+                                    // Shift: row1 -> row0, read new row1
+                                    for (integer i = 0; i < 64; i = i + 1) begin
+                                        src_row0[i] <= src_row1[i];
+                                    end
+                                    row0_valid <= row1_valid;
+                                    row1_valid <= 1'b0;
+                                    cached_row <= cached_row + 1;
+                                    reading_row1 <= 1'b1;
+                                end else begin
+                                    // Read completely new rows
+                                    row0_valid <= 1'b0;
+                                    row1_valid <= 1'b0;
+                                    cached_row <= req_row;
+                                    reading_row1 <= 1'b0;
+                                end
+                                
                                 ar_valid <= 1'b1;
-                                ar_addr <= calc_read_addr(next_row, next_col, mat_width);
-                                ar_len <= next_read_info[2:0] - 1;
-                                src_read_len <= next_read_info[3:0];
+                                ar_addr <= src_addr + (req_row - 1) * mat_width * 4;
+                                ar_len <= mat_width - 1;
                                 r_ready <= 1'b1;
-                                src_read_cnt <= 2'd0;
+                                read_cnt <= 6'd0;
                             end else begin
-                                // All padding for this block
+                                // Can use cached data
                                 state <= S_WRITE_2X2;
                                 aw_valid <= 1'b1;
                                 aw_addr <= calc_write_addr(next_row, next_col, mat_width);
