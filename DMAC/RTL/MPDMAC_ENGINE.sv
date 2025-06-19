@@ -60,12 +60,9 @@ module MPDMAC_ENGINE
     localparam S_IDLE           = 4'd0;
     localparam S_READ_3x3       = 4'd1;
     localparam S_PREPARE_BLOCK  = 4'd2;
-    localparam S_WRITE_TL       = 4'd3;
-    localparam S_WRITE_TR       = 4'd4;
-    localparam S_WRITE_BL       = 4'd5;
-    localparam S_WRITE_BR       = 4'd6;
-    localparam S_NEXT_BLOCK     = 4'd7;
-    localparam S_DONE           = 4'd8;
+    localparam S_WRITE_BURST    = 4'd3;
+    localparam S_NEXT_BLOCK     = 4'd4;
+    localparam S_DONE           = 4'd5;
 
     reg [3:0] state;
     
@@ -92,6 +89,10 @@ module MPDMAC_ENGINE
     reg [3:0]  read_count;
     reg [3:0]  read_needed;
     reg        reading_active;
+    
+    // Write state for burst
+    reg [1:0]  write_count;
+    reg [31:0] write_base_addr;
     
     // AXI control signals
     reg        ar_valid;
@@ -121,7 +122,7 @@ module MPDMAC_ENGINE
     // AXI AR channel
     assign arid_o = 4'd0;
     assign araddr_o = ar_addr;
-    assign arlen_o = 4'd0;      // Single read
+    assign arlen_o = 4'd2;      // Burst of 3 for row-based reading
     assign arsize_o = 3'b010;   // 4 bytes
     assign arburst_o = 2'b01;   // INCR
     assign arvalid_o = ar_valid;
@@ -130,7 +131,7 @@ module MPDMAC_ENGINE
     // AXI AW channel  
     assign awid_o = 4'd0;
     assign awaddr_o = aw_addr;
-    assign awlen_o = 4'd0;      // Single write transaction
+    assign awlen_o = 4'd0;      // Single write per transaction (but pipelined)
     assign awsize_o = 3'b010;   // 4 bytes
     assign awburst_o = 2'b01;   // INCR
     assign awvalid_o = aw_valid;
@@ -226,25 +227,13 @@ module MPDMAC_ENGINE
             rel_r = src_r - center_row;
             rel_c = src_c - center_col;
             
-            // Debug output for critical positions (row/col 8 and 9)
-            if (out_r >= 8 || out_c >= 8) begin
-                $display("[DEBUG] calc_output_value: out_pos(%0d,%0d) -> src_pos(%0d,%0d) -> rel_pos(%0d,%0d) vs center(%0d,%0d)", 
-                         out_r, out_c, src_r, src_c, rel_r, rel_c, center_row, center_col);
-            end
-            
             // Check if within 3x3 buffer range
             if (rel_r >= -1 && rel_r <= 1 && rel_c >= -1 && rel_c <= 1) begin
                 // Convert to buffer index and get value
                 calc_output_value = buffer_3x3[(rel_r + 1) * 3 + (rel_c + 1)];
-                if (out_r >= 8 || out_c >= 8) begin
-                    $display("[DEBUG] Buffer index: %0d, value: %0d", (rel_r + 1) * 3 + (rel_c + 1), calc_output_value);
-                end
             end else begin
                 // Should not happen in correct implementation
                 calc_output_value = 32'd0;
-                if (out_r >= 8 || out_c >= 8) begin
-                    $display("[DEBUG] ERROR: Position out of buffer range! Setting to 0");
-                end
             end
         end
     endfunction
@@ -303,9 +292,6 @@ module MPDMAC_ENGINE
                         center_row <= 7'd1;
                         center_col <= 7'd1;
                         
-                        $display("[DEBUG] Starting DMA with mat_width=%0d", mat_width_i);
-                        $display("[DEBUG] Initial: block_pos(0,0), center_pos(1,1)");
-                        
                         state <= S_READ_3x3;
                         read_count <= 4'd0;
                         read_needed <= 4'd9;
@@ -317,16 +303,16 @@ module MPDMAC_ENGINE
                 
                 S_READ_3x3: begin
                     if (!reading_active) begin
-                        // Start reading the next element of 3x3 region
-                        reg signed [6:0] target_r, target_c;
+                        // Read row by row with burst (3 elements per row)
+                        reg signed [6:0] row_base_r, row_base_c;
                         reg [31:0] read_addr_offset;
                         
-                        // Calculate which element we're reading (row-major order)
-                        target_r = center_row - 1 + (read_count / 3);
-                        target_c = center_col - 1 + (read_count % 3);
+                        // Calculate base position for current row
+                        row_base_r = center_row - 1 + (read_count / 3);
+                        row_base_c = center_col - 1;
                         
-                        // Calculate read address with mirroring
-                        read_addr_offset = get_mirrored_addr(target_r, target_c, mat_width);
+                        // Calculate read address with mirroring for leftmost element
+                        read_addr_offset = get_mirrored_addr(row_base_r, row_base_c, mat_width);
                         
                         ar_valid <= 1'b1;
                         ar_addr <= src_addr + read_addr_offset;
@@ -341,13 +327,20 @@ module MPDMAC_ENGINE
                     if (r_handshake) begin
                         buffer_3x3[read_count] <= rdata_i;
                         read_count <= read_count + 1;
-                        reading_active <= 1'b0;
-                        r_ready <= 1'b0;
+                        
+                        // Check if we've read all 3 elements of current row
+                        if ((read_count % 3) == 2) begin
+                            // End of row burst, reset for next row
+                            reading_active <= 1'b0;
+                            r_ready <= 1'b0;
+                        end
                         
                         if (read_count == read_needed - 1) begin
                             // All 3x3 data read, prepare 2x2 block
                             state <= S_PREPARE_BLOCK;
                             read_count <= 4'd0;
+                            reading_active <= 1'b0;
+                            r_ready <= 1'b0;
                         end
                     end
                 end
@@ -359,106 +352,59 @@ module MPDMAC_ENGINE
                     output_block[2] <= calc_output_value(block_row + 1, block_col, mat_width);     // BL
                     output_block[3] <= calc_output_value(block_row + 1, block_col + 1, mat_width); // BR
                     
-                    $display("[DEBUG] Processing block at (%0d,%0d), center=(%0d,%0d)", 
-                             block_row, block_col, center_row, center_col);
-                    $display("[DEBUG] Output positions: TL(%0d,%0d) TR(%0d,%0d) BL(%0d,%0d) BR(%0d,%0d)",
-                             block_row, block_col, block_row, block_col+1, 
-                             block_row+1, block_col, block_row+1, block_col+1);
-                    
-                    state <= S_WRITE_TL;
+                    state <= S_WRITE_BURST;
+                    write_count <= 2'd0;
                     
                     // Start write transaction for TL
                     aw_valid <= 1'b1;
                     aw_addr <= calc_output_addr(block_row, block_col, mat_width);  // TL address
                 end
                 
-                S_WRITE_TL: begin
+                S_WRITE_BURST: begin
                     if (aw_handshake) begin
                         aw_valid <= 1'b0;
                         w_valid <= 1'b1;
-                        w_data <= output_block[0];  // TL
-                        w_last <= 1'b1;
                         b_ready <= 1'b1;
-                    end
-                    
-                    if (w_handshake) begin
-                        w_valid <= 1'b0;
-                        w_last <= 1'b0;
-                    end
-                    
-                    if (b_handshake) begin
-                        b_ready <= 1'b0;
-                        state <= S_WRITE_TR;
                         
-                        // Start write transaction for TR
-                        aw_valid <= 1'b1;
-                        aw_addr <= calc_output_addr(block_row, block_col + 1, mat_width);  // TR address
-                    end
-                end
-                
-                S_WRITE_TR: begin
-                    if (aw_handshake) begin
-                        aw_valid <= 1'b0;
-                        w_valid <= 1'b1;
-                        w_data <= output_block[1];  // TR
-                        w_last <= 1'b1;
-                        b_ready <= 1'b1;
+                        case (write_count)
+                            2'd0: begin
+                                w_data <= output_block[0];  // TL
+                                w_last <= 1'b0;
+                            end
+                            2'd1: begin
+                                w_data <= output_block[1];  // TR
+                                w_last <= 1'b0;
+                            end
+                            2'd2: begin
+                                w_data <= output_block[2];  // BL
+                                w_last <= 1'b0;
+                            end
+                            2'd3: begin
+                                w_data <= output_block[3];  // BR
+                                w_last <= 1'b1;
+                            end
+                        endcase
                     end
                     
                     if (w_handshake) begin
-                        w_valid <= 1'b0;
-                        w_last <= 1'b0;
-                    end
-                    
-                    if (b_handshake) begin
-                        b_ready <= 1'b0;
-                        state <= S_WRITE_BL;
+                        write_count <= write_count + 1;
                         
-                        // Start write transaction for BL
-                        aw_valid <= 1'b1;
-                        aw_addr <= calc_output_addr(block_row + 1, block_col, mat_width);  // BL address
-                    end
-                end
-                
-                S_WRITE_BL: begin
-                    if (aw_handshake) begin
-                        aw_valid <= 1'b0;
-                        w_valid <= 1'b1;
-                        w_data <= output_block[2];  // BL
-                        w_last <= 1'b1;
-                        b_ready <= 1'b1;
-                    end
-                    
-                    if (w_handshake) begin
-                        w_valid <= 1'b0;
-                        w_last <= 1'b0;
+                        if (write_count == 2'd3) begin
+                            // Last write data sent
+                            w_valid <= 1'b0;
+                            w_last <= 1'b0;
+                        end else begin
+                            // More data to write, start next address
+                            case (write_count)
+                                2'd0: aw_addr <= calc_output_addr(block_row, block_col + 1, mat_width);     // TR
+                                2'd1: aw_addr <= calc_output_addr(block_row + 1, block_col, mat_width);     // BL
+                                2'd2: aw_addr <= calc_output_addr(block_row + 1, block_col + 1, mat_width); // BR
+                            endcase
+                            aw_valid <= 1'b1;
+                        end
                     end
                     
-                    if (b_handshake) begin
-                        b_ready <= 1'b0;
-                        state <= S_WRITE_BR;
-                        
-                        // Start write transaction for BR
-                        aw_valid <= 1'b1;
-                        aw_addr <= calc_output_addr(block_row + 1, block_col + 1, mat_width);  // BR address
-                    end
-                end
-                
-                S_WRITE_BR: begin
-                    if (aw_handshake) begin
-                        aw_valid <= 1'b0;
-                        w_valid <= 1'b1;
-                        w_data <= output_block[3];  // BR
-                        w_last <= 1'b1;
-                        b_ready <= 1'b1;
-                    end
-                    
-                    if (w_handshake) begin
-                        w_valid <= 1'b0;
-                        w_last <= 1'b0;
-                    end
-                    
-                    if (b_handshake) begin
+                    if (b_handshake && write_count == 2'd3) begin
                         b_ready <= 1'b0;
                         state <= S_NEXT_BLOCK;
                     end
@@ -476,13 +422,8 @@ module MPDMAC_ENGINE
                         end else begin
                             center_col <= mat_width;  // Clamp to last valid column
                         end
-                        $display("[DEBUG] Moving to next column: block_col=%0d->%0d, center_col=%0d->%0d", 
-                                 block_col, block_col + 2, center_col, 
-                                 (center_col + 2 <= mat_width) ? center_col + 2 : mat_width);
                     end else begin
                         // End of row, move to next row
-                        $display("[DEBUG] End of row. Moving to next row: block_row=%0d->%0d, block_col=%0d->0", 
-                                 block_row, block_row + 2, block_col);
                         block_col <= 6'd0;
                         center_col <= 7'd1;
                         
@@ -499,8 +440,6 @@ module MPDMAC_ENGINE
                     // Check if done - we need to process all blocks including block_row = width
                     // After incrementing from block_row = width, it becomes width+2 > width
                     if (block_row > mat_width) begin  
-                        $display("[DEBUG] All blocks processed. block_row=%0d > mat_width=%0d. Going to DONE.", 
-                                 block_row, mat_width);
                         state <= S_DONE;
                     end else begin
                         state <= S_READ_3x3;
