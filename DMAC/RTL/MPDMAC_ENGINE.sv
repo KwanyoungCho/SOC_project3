@@ -137,31 +137,36 @@ module MPDMAC_ENGINE
     assign bready_o = b_ready;
     
     // 출력 좌표를 소스 행으로 변환 (미러 패딩 적용)
+    // 반환되는 값은 원본 행의 0-based 인덱스이다.
     function [5:0] get_source_row;
         input [5:0] out_r;
         input [5:0] width;
         begin
             if (out_r == 0) begin
-                get_source_row = 1;  // 상단 패딩: row 1에서 미러
+                // 첫 번째 패딩 라인은 두 번째 행을 복사한다.
+                get_source_row = 6'd1;
             end else if (out_r == width + 1) begin
-                get_source_row = width;  // 하단 패딩: row width에서 미러
+                // 마지막 패딩 라인은 끝에서 두 번째 행을 복사한다.
+                get_source_row = width - 2;
             end else begin
-                get_source_row = out_r;  // 일반 영역: 그대로 사용
+                // 내부 영역은 1을 빼서 원본 행 인덱스를 얻는다.
+                get_source_row = out_r - 1;
             end
         end
     endfunction
-    
-    // 출력 좌표를 소스 열로 변환 (미러 패딩 적용)  
+
+    // 출력 좌표를 소스 열로 변환 (미러 패딩 적용)
+    // 반환되는 값은 원본 열의 0-based 인덱스이다.
     function [5:0] get_source_col;
         input [5:0] out_c;
         input [5:0] width;
         begin
             if (out_c == 0) begin
-                get_source_col = 1;  // 좌측 패딩: col 1에서 미러
+                get_source_col = 6'd1;
             end else if (out_c == width + 1) begin
-                get_source_col = width;  // 우측 패딩: col width에서 미러
+                get_source_col = width - 2;
             end else begin
-                get_source_col = out_c;  // 일반 영역: 그대로 사용
+                get_source_col = out_c - 1;
             end
         end
     endfunction
@@ -186,9 +191,9 @@ module MPDMAC_ENGINE
             
             // 캐시에서 값 가져오기
             if (src_r == cached_row) begin
-                get_padded_value = src_row0[src_c - 1];  // 0-based indexing for array
+                get_padded_value = src_row0[src_c];
             end else if (src_r == cached_row + 1) begin
-                get_padded_value = src_row1[src_c - 1];  // 0-based indexing for array
+                get_padded_value = src_row1[src_c];
             end else begin
                 get_padded_value = 32'd0;  // Error case
             end
@@ -207,8 +212,8 @@ module MPDMAC_ENGINE
             src_r1 = get_source_row(out_r + 1, width);
             
             // 필요한 행들이 캐시되어 있지 않으면 읽기 필요
-            need_read_source = (!row0_valid || cached_row != src_r0) || 
-                              (!row1_valid || cached_row + 1 != src_r1 || cached_row + 1 > width);
+            need_read_source = (!row0_valid || cached_row != src_r0) ||
+                              (!row1_valid || cached_row + 1 != src_r1 || cached_row + 1 >= width);
         end
     endfunction
     
