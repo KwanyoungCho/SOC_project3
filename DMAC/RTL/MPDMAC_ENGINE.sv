@@ -470,9 +470,15 @@ module MPDMAC_ENGINE
                     // For width=8, we need blocks at columns 0,2,4,6,8
                     if (block_col + 2 <= mat_width) begin  // Continue if next block position is valid
                         block_col <= block_col + 2;
-                        center_col <= center_col + 2;
+                        // Keep center within source matrix bounds (1 to width)
+                        if (center_col + 2 <= mat_width) begin
+                            center_col <= center_col + 2;
+                        end else begin
+                            center_col <= mat_width;  // Clamp to last valid column
+                        end
                         $display("[DEBUG] Moving to next column: block_col=%0d->%0d, center_col=%0d->%0d", 
-                                 block_col, block_col + 2, center_col, center_col + 2);
+                                 block_col, block_col + 2, center_col, 
+                                 (center_col + 2 <= mat_width) ? center_col + 2 : mat_width);
                     end else begin
                         // End of row, move to next row
                         $display("[DEBUG] End of row. Moving to next row: block_row=%0d->%0d, block_col=%0d->0", 
@@ -482,7 +488,12 @@ module MPDMAC_ENGINE
                         
                         // Move to next row
                         block_row <= block_row + 2;
-                        center_row <= center_row + 2;
+                        // Keep center within source matrix bounds (1 to width)
+                        if (center_row + 2 <= mat_width) begin
+                            center_row <= center_row + 2;
+                        end else begin
+                            center_row <= mat_width;  // Clamp to last valid row
+                        end
                     end
                     
                     // Check if done - we need to process all blocks including block_row = width
