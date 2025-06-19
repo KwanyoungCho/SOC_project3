@@ -290,11 +290,13 @@ module MPDMAC_ENGINE
                         
                         // Check if first block needs reading
                         if (need_source_read(6'd0, 6'd0, mat_width_i)) begin
+                            reg [4:0] read_info;
+                            read_info = calc_read_info(6'd0, 6'd0, mat_width_i);
                             state <= S_READ_BLOCK;
                             ar_valid <= 1'b1;
                             ar_addr <= calc_read_addr(6'd0, 6'd0, mat_width_i);
-                            ar_len <= calc_read_info(6'd0, 6'd0, mat_width_i)[2:0] - 1; // AXI length is actual-1
-                            src_read_len <= calc_read_info(6'd0, 6'd0, mat_width_i)[3:0];
+                            ar_len <= read_info[2:0] - 1; // AXI length is actual-1
+                            src_read_len <= read_info[3:0];
                             r_ready <= 1'b1;
                             src_read_cnt <= 2'd0;
                         end else begin
@@ -395,11 +397,13 @@ module MPDMAC_ENGINE
                             
                             // Check if next block needs reading
                             if (need_source_read(next_row, next_col, mat_width)) begin
+                                reg [4:0] next_read_info;
+                                next_read_info = calc_read_info(next_row, next_col, mat_width);
                                 state <= S_READ_BLOCK;
                                 ar_valid <= 1'b1;
                                 ar_addr <= calc_read_addr(next_row, next_col, mat_width);
-                                ar_len <= calc_read_info(next_row, next_col, mat_width)[2:0] - 1;
-                                src_read_len <= calc_read_info(next_row, next_col, mat_width)[3:0];
+                                ar_len <= next_read_info[2:0] - 1;
+                                src_read_len <= next_read_info[3:0];
                                 r_ready <= 1'b1;
                                 src_read_cnt <= 2'd0;
                             end else begin
