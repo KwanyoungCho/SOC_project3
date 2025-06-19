@@ -55,62 +55,54 @@ module MPDMAC_ENGINE
     input   wire                        rvalid_i,
     output  wire                        rready_o
 );
-    // Design here
 
-    // State Machine
-    localparam S_IDLE           = 5'd0;
-    localparam S_READ_PREV_ROW  = 5'd1;
-    localparam S_READ_CURR_ROW  = 5'd2;
-    localparam S_READ_NEXT_ROW  = 5'd3;
-    localparam S_WRITE_TOP      = 5'd4;
-    localparam S_WRITE_MID      = 5'd5;
-    localparam S_WRITE_BOT      = 5'd6;
-    localparam S_WAIT_WRITE     = 5'd7;
-    localparam S_DONE           = 5'd8;
+    // State Machine (Project2 스타일 간소화)
+    localparam S_IDLE           = 2'd0;
+    localparam S_READ_ROW       = 2'd1;
+    localparam S_WRITE_ROW      = 2'd2;
+    localparam S_DONE           = 2'd3;
 
-    reg [4:0] state, state_n;
+    reg [1:0] state;
     
     // Internal registers
-    reg [31:0] src_addr, src_addr_n;
-    reg [31:0] dst_addr, dst_addr_n;
-    reg [5:0]  mat_width, mat_width_n;
-    reg        done, done_n;
+    reg [31:0] src_addr;
+    reg [31:0] dst_addr;
+    reg [5:0]  mat_width;
+    reg        done;
     
-    // Row buffers to store 3 rows (previous, current, next)
-    reg [31:0] prev_row [0:31];
-    reg [31:0] curr_row [0:31];
-    reg [31:0] next_row [0:31];
-    reg [31:0] prev_row_n [0:31];
-    reg [31:0] curr_row_n [0:31];
-    reg [31:0] next_row_n [0:31];
+    // Row buffer to store one row at a time
+    reg [31:0] row_buffer [0:31];
     
     // Position counters
-    reg [5:0]  row_idx, row_idx_n;
-    reg [5:0]  col_idx, col_idx_n;
-    reg [5:0]  write_col, write_col_n;
+    reg [5:0]  row_idx;          // Current output row (0 to mat_width+1)
+    reg [5:0]  col_idx;          // Current column being processed
     
-    // Read channel control
-    reg        ar_valid, ar_valid_n;
-    reg [31:0] ar_addr, ar_addr_n;
-    reg [3:0]  ar_len, ar_len_n;
-    reg        r_ready, r_ready_n;
-    reg [5:0]  read_col, read_col_n;
-    reg [1:0]  read_row_type, read_row_type_n; // 0: prev, 1: curr, 2: next
+    // Read/Write control (Project2 스타일)
+    reg        ar_valid;
+    reg [31:0] ar_addr;
+    reg [3:0]  ar_len;
+    reg        r_ready;
     
-    // Write channel control
-    reg        aw_valid, aw_valid_n;
-    reg [31:0] aw_addr, aw_addr_n;
-    reg [3:0]  aw_len, aw_len_n;
-    reg        w_valid, w_valid_n;
-    reg [31:0] w_data, w_data_n;
-    reg        w_last, w_last_n;
-    reg        b_ready, b_ready_n;
-    reg [5:0]  w_cnt, w_cnt_n;
+    reg        aw_valid;
+    reg [31:0] aw_addr;
+    reg [3:0]  aw_len;
+    reg        w_valid;
+    reg [31:0] w_data;
+    reg        w_last;
+    reg        b_ready;
+    reg [3:0]  write_cnt;
+    
+    // Handshake signals (Project2 스타일)
+    wire ar_handshake = ar_valid & arready_i;
+    wire r_handshake = rvalid_i & r_ready;
+    wire aw_handshake = aw_valid & awready_i;
+    wire w_handshake = w_valid & wready_i;
+    wire b_handshake = bvalid_i & b_ready;
     
     // Output assignments
     assign done_o = done;
     
-    // AXI AR channel
+    // AXI AR channel (Project2 스타일)
     assign arid_o = 4'd0;
     assign araddr_o = ar_addr;
     assign arlen_o = ar_len;
@@ -121,7 +113,7 @@ module MPDMAC_ENGINE
     // AXI R channel
     assign rready_o = r_ready;
     
-    // AXI AW channel
+    // AXI AW channel (Project2 스타일)
     assign awid_o = 4'd0;
     assign awaddr_o = aw_addr;
     assign awlen_o = aw_len;
@@ -129,7 +121,7 @@ module MPDMAC_ENGINE
     assign awburst_o = 2'b01; // INCR
     assign awvalid_o = aw_valid;
     
-    // AXI W channel
+    // AXI W channel (Project2 스타일)
     assign wid_o = 4'd0;
     assign wdata_o = w_data;
     assign wstrb_o = 4'hF;
@@ -139,7 +131,43 @@ module MPDMAC_ENGINE
     // AXI B channel
     assign bready_o = b_ready;
     
-    // Sequential logic
+    // Get source row for padding
+    function [5:0] get_src_row;
+        input [5:0] out_row;
+        input [5:0] width;
+        begin
+            if (out_row == 0) 
+                get_src_row = 1;  // Top padding - mirror from row 1
+            else if (out_row == width + 1) 
+                get_src_row = width - 2;  // Bottom padding - mirror from row width-2
+            else 
+                get_src_row = out_row - 1;  // Normal row (0-indexed)
+        end
+    endfunction
+    
+    // Get padded data value
+    function [31:0] get_padded_value;
+        input [5:0] out_col;
+        input [5:0] width;
+        reg [5:0] src_col;
+        begin
+            // Mirror padding logic for columns
+            if (out_col == 0) begin
+                // Left padding - mirror from col 1
+                src_col = 1;
+            end else if (out_col == width + 1) begin
+                // Right padding - mirror from col width-2
+                src_col = width - 2;
+            end else begin
+                // Normal col (0-indexed)
+                src_col = out_col - 1;
+            end
+            
+            get_padded_value = row_buffer[src_col];
+        end
+    endfunction
+    
+    // Main state machine (Project2 스타일)
     always @(posedge clk) begin
         if (!rst_n) begin
             state <= S_IDLE;
@@ -150,14 +178,11 @@ module MPDMAC_ENGINE
             
             row_idx <= 6'd0;
             col_idx <= 6'd0;
-            write_col <= 6'd0;
             
             ar_valid <= 1'b0;
             ar_addr <= 32'd0;
             ar_len <= 4'd0;
             r_ready <= 1'b0;
-            read_col <= 6'd0;
-            read_row_type <= 2'd0;
             
             aw_valid <= 1'b0;
             aw_addr <= 32'd0;
@@ -166,357 +191,126 @@ module MPDMAC_ENGINE
             w_data <= 32'd0;
             w_last <= 1'b0;
             b_ready <= 1'b0;
-            w_cnt <= 6'd0;
+            write_cnt <= 4'd0;
             
             for (integer i = 0; i < 32; i = i + 1) begin
-                prev_row[i] <= 32'd0;
-                curr_row[i] <= 32'd0;
-                next_row[i] <= 32'd0;
+                row_buffer[i] <= 32'd0;
             end
         end else begin
-            state <= state_n;
-            src_addr <= src_addr_n;
-            dst_addr <= dst_addr_n;
-            mat_width <= mat_width_n;
-            done <= done_n;
-            
-            row_idx <= row_idx_n;
-            col_idx <= col_idx_n;
-            write_col <= write_col_n;
-            
-            ar_valid <= ar_valid_n;
-            ar_addr <= ar_addr_n;
-            ar_len <= ar_len_n;
-            r_ready <= r_ready_n;
-            read_col <= read_col_n;
-            read_row_type <= read_row_type_n;
-            
-            aw_valid <= aw_valid_n;
-            aw_addr <= aw_addr_n;
-            aw_len <= aw_len_n;
-            w_valid <= w_valid_n;
-            w_data <= w_data_n;
-            w_last <= w_last_n;
-            b_ready <= b_ready_n;
-            w_cnt <= w_cnt_n;
-            
-            for (integer i = 0; i < 32; i = i + 1) begin
-                prev_row[i] <= prev_row_n[i];
-                curr_row[i] <= curr_row_n[i];
-                next_row[i] <= next_row_n[i];
-            end
-        end
-    end
-    
-    // Get padded value function
-    function [31:0] get_padded_value;
-        input [5:0] row;
-        input [5:0] col;
-        input [5:0] width;
-        reg [5:0] src_row, src_col;
-        begin
-            // Top padding
-            if (row == 0) begin
-                src_row = 1;
-            // Bottom padding
-            end else if (row == width + 1) begin
-                src_row = width - 2;
-            // Original rows
-            end else begin
-                src_row = row - 1;
-            end
-            
-            // Left padding
-            if (col == 0) begin
-                src_col = 1;
-            // Right padding
-            end else if (col == width + 1) begin
-                src_col = width - 2;
-            // Original columns
-            end else begin
-                src_col = col - 1;
-            end
-            
-            // Return value from appropriate buffer
-            if (row_idx == 0) begin
-                // Writing first padded row
-                get_padded_value = curr_row[src_col];
-            end else if (row_idx == width + 1) begin
-                // Writing last padded row
-                get_padded_value = prev_row[src_col];
-            end else begin
-                // Writing middle rows
-                if (src_row == row_idx - 2) begin
-                    get_padded_value = prev_row[src_col];
-                end else if (src_row == row_idx - 1) begin
-                    get_padded_value = curr_row[src_col];
-                end else begin
-                    get_padded_value = next_row[src_col];
-                end
-            end
-        end
-    endfunction
-    
-    // Combinational logic
-    always @(*) begin
-        // Default values
-        state_n = state;
-        src_addr_n = src_addr;
-        dst_addr_n = dst_addr;
-        mat_width_n = mat_width;
-        done_n = done;
-        
-        row_idx_n = row_idx;
-        col_idx_n = col_idx;
-        write_col_n = write_col;
-        
-        ar_valid_n = ar_valid;
-        ar_addr_n = ar_addr;
-        ar_len_n = ar_len;
-        r_ready_n = r_ready;
-        read_col_n = read_col;
-        read_row_type_n = read_row_type;
-        
-        aw_valid_n = aw_valid;
-        aw_addr_n = aw_addr;
-        aw_len_n = aw_len;
-        w_valid_n = w_valid;
-        w_data_n = w_data;
-        w_last_n = w_last;
-        b_ready_n = b_ready;
-        w_cnt_n = w_cnt;
-        
-        for (integer i = 0; i < 32; i = i + 1) begin
-            prev_row_n[i] = prev_row[i];
-            curr_row_n[i] = curr_row[i];
-            next_row_n[i] = next_row[i];
-        end
-        
-        case (state)
-            S_IDLE: begin
-                done_n = 1'b1;  // Keep done high in IDLE state
-                if (start_i) begin
-                    done_n = 1'b0;  // Clear done when starting
-                    src_addr_n = src_addr_i;
-                    dst_addr_n = dst_addr_i;
-                    mat_width_n = mat_width_i;
-                    row_idx_n = 6'd0;
-                    col_idx_n = 6'd0;
-                    read_col_n = 6'd0;
-                    write_col_n = 6'd0;
-                    state_n = S_READ_CURR_ROW;
-                    
-                    // Setup first read (row 0)
-                    ar_valid_n = 1'b1;
-                    ar_addr_n = src_addr_i;
-                    ar_len_n = mat_width_i - 1;
-                    r_ready_n = 1'b1;
-                    read_row_type_n = 2'd1; // curr
-                end
-            end
-            
-            S_READ_CURR_ROW: begin
-                // AR channel handshake
-                if (ar_valid && arready_i) begin
-                    ar_valid_n = 1'b0;
+            case (state)
+                S_IDLE: begin
+                    done <= 1'b1;
+                    if (start_i) begin
+                        done <= 1'b0;
+                        src_addr <= src_addr_i;
+                        dst_addr <= dst_addr_i;
+                        mat_width <= mat_width_i;
+                        row_idx <= 6'd0;
+                        col_idx <= 6'd0;
+                        
+                        // Start reading first source row
+                        state <= S_READ_ROW;
+                        ar_valid <= 1'b1;
+                        ar_addr <= src_addr_i;
+                        ar_len <= mat_width_i - 1;
+                        r_ready <= 1'b1;
+                    end
                 end
                 
-                // R channel data reception
-                if (rvalid_i && r_ready) begin
-                    curr_row_n[read_col] = rdata_i;
-                    read_col_n = read_col + 1;
+                S_READ_ROW: begin
+                    // AR handshake
+                    if (ar_handshake) begin
+                        ar_valid <= 1'b0;
+                    end
                     
-                    if (rlast_i) begin
-                        read_col_n = 6'd0;
+                    // Read data
+                    if (r_handshake) begin
+                        row_buffer[col_idx] <= rdata_i;
+                        col_idx <= col_idx + 1;
                         
-                        if (row_idx == 0) begin
-                            // First row read, read second row
-                            state_n = S_READ_NEXT_ROW;
-                            ar_valid_n = 1'b1;
-                            ar_addr_n = src_addr + mat_width * 4;
-                            ar_len_n = mat_width - 1;
+                        if (rlast_i) begin
+                            col_idx <= 6'd0;
+                            r_ready <= 1'b0;
+                            
+                            // Start writing padded row
+                            state <= S_WRITE_ROW;
+                            aw_valid <= 1'b1;
+                            aw_addr <= dst_addr + (row_idx * (mat_width + 2) * 4);
+                            aw_len <= mat_width + 1;  // N+2 elements
+                            write_cnt <= 4'd0;
+                        end
+                    end
+                end
+                
+                S_WRITE_ROW: begin
+                    // AW handshake
+                    if (aw_handshake) begin
+                        aw_valid <= 1'b0;
+                        w_valid <= 1'b1;
+                        b_ready <= 1'b1;
+                        w_data <= get_padded_value(6'd0, mat_width);  // First column
+                    end
+                    
+                    // Write data
+                    if (w_handshake) begin
+                        write_cnt <= write_cnt + 1;
+                        
+                        if (write_cnt == mat_width + 1) begin
+                            w_last <= 1'b1;
                         end else begin
-                            // Start writing current row
-                            state_n = S_WRITE_TOP;
-                            r_ready_n = 1'b0;
-                        end
-                    end
-                end
-            end
-            
-            S_READ_NEXT_ROW: begin
-                // AR channel handshake
-                if (ar_valid && arready_i) begin
-                    ar_valid_n = 1'b0;
-                end
-                
-                // R channel data reception
-                if (rvalid_i && r_ready) begin
-                    next_row_n[read_col] = rdata_i;
-                    read_col_n = read_col + 1;
-                    
-                    if (rlast_i) begin
-                        read_col_n = 6'd0;
-                        r_ready_n = 1'b0;
-                        state_n = S_WRITE_TOP;
-                    end
-                end
-            end
-            
-            S_WRITE_TOP: begin
-                // Write first padded row
-                if (!aw_valid || (aw_valid && awready_i)) begin
-                    aw_valid_n = 1'b1;
-                    aw_addr_n = dst_addr;
-                    aw_len_n = mat_width + 1;
-                    w_valid_n = 1'b1;
-                    w_cnt_n = 6'd0;
-                    write_col_n = 6'd0;
-                    b_ready_n = 1'b1;
-                end
-                
-                if (aw_valid && awready_i) begin
-                    aw_valid_n = 1'b0;
-                end
-                
-                if (w_valid && wready_i) begin
-                    w_data_n = get_padded_value(row_idx, write_col, mat_width);
-                    write_col_n = write_col + 1;
-                    w_cnt_n = w_cnt + 1;
-                    
-                    if (w_cnt == mat_width + 1) begin
-                        w_last_n = 1'b1;
-                    end else begin
-                        w_last_n = 1'b0;
-                    end
-                    
-                    if (w_last) begin
-                        w_valid_n = 1'b0;
-                        w_last_n = 1'b0;
-                        row_idx_n = 6'd1;
-                        write_col_n = 6'd0;
-                        state_n = S_WAIT_WRITE;
-                    end
-                end
-            end
-            
-            S_WRITE_MID: begin
-                // Write middle rows with padding
-                if (!aw_valid || (aw_valid && awready_i)) begin
-                    aw_valid_n = 1'b1;
-                    aw_addr_n = dst_addr + (row_idx * (mat_width + 2) * 4);
-                    aw_len_n = mat_width + 1;
-                    w_valid_n = 1'b1;
-                    w_cnt_n = 6'd0;
-                    write_col_n = 6'd0;
-                end
-                
-                if (aw_valid && awready_i) begin
-                    aw_valid_n = 1'b0;
-                end
-                
-                if (w_valid && wready_i) begin
-                    w_data_n = get_padded_value(row_idx, write_col, mat_width);
-                    write_col_n = write_col + 1;
-                    w_cnt_n = w_cnt + 1;
-                    
-                    if (w_cnt == mat_width + 1) begin
-                        w_last_n = 1'b1;
-                    end else begin
-                        w_last_n = 1'b0;
-                    end
-                    
-                    if (w_last) begin
-                        w_valid_n = 1'b0;
-                        w_last_n = 1'b0;
-                        write_col_n = 6'd0;
-                        state_n = S_WAIT_WRITE;
-                    end
-                end
-            end
-            
-            S_WRITE_BOT: begin
-                // Write last padded row
-                if (!aw_valid || (aw_valid && awready_i)) begin
-                    aw_valid_n = 1'b1;
-                    aw_addr_n = dst_addr + ((mat_width + 1) * (mat_width + 2) * 4);
-                    aw_len_n = mat_width + 1;
-                    w_valid_n = 1'b1;
-                    w_cnt_n = 6'd0;
-                    write_col_n = 6'd0;
-                end
-                
-                if (aw_valid && awready_i) begin
-                    aw_valid_n = 1'b0;
-                end
-                
-                if (w_valid && wready_i) begin
-                    w_data_n = get_padded_value(row_idx, write_col, mat_width);
-                    write_col_n = write_col + 1;
-                    w_cnt_n = w_cnt + 1;
-                    
-                    if (w_cnt == mat_width + 1) begin
-                        w_last_n = 1'b1;
-                    end else begin
-                        w_last_n = 1'b0;
-                    end
-                    
-                    if (w_last) begin
-                        w_valid_n = 1'b0;
-                        w_last_n = 1'b0;
-                        state_n = S_DONE;
-                    end
-                end
-            end
-            
-            S_WAIT_WRITE: begin
-                if (bvalid_i && b_ready) begin
-                    b_ready_n = 1'b0;
-                    
-                    if (row_idx == mat_width + 1) begin
-                        // All done
-                        state_n = S_DONE;
-                    end else if (row_idx == mat_width) begin
-                        // Write last padded row
-                        row_idx_n = mat_width + 1;
-                        state_n = S_WRITE_BOT;
-                    end else begin
-                        // Prepare for next row
-                        row_idx_n = row_idx + 1;
-                        
-                        // Shift row buffers
-                        for (integer i = 0; i < 32; i = i + 1) begin
-                            prev_row_n[i] = curr_row[i];
-                            curr_row_n[i] = next_row[i];
+                            w_last <= 1'b0;
+                            w_data <= get_padded_value(write_cnt + 1, mat_width);  // Next column
                         end
                         
-                        // Read next row if not at the end
-                        if (row_idx < mat_width - 1) begin
-                            ar_valid_n = 1'b1;
-                            ar_addr_n = src_addr + ((row_idx + 1) * mat_width * 4);
-                            ar_len_n = mat_width - 1;
-                            r_ready_n = 1'b1;
-                            read_col_n = 6'd0;
-                            state_n = S_READ_NEXT_ROW;
+                        if (w_last) begin
+                            w_valid <= 1'b0;
+                            w_last <= 1'b0;
+                        end
+                    end
+                    
+                    // B handshake
+                    if (b_handshake) begin
+                        b_ready <= 1'b0;
+                        row_idx <= row_idx + 1;
+                        write_cnt <= 4'd0;
+                        
+                        if (row_idx == mat_width + 1) begin
+                            // All rows written
+                            state <= S_DONE;
                         end else begin
-                            // Last row, no more reads needed
-                            state_n = S_WRITE_MID;
+                            // Check if we need to read a new source row
+                            reg [5:0] next_src_row;
+                            reg [5:0] curr_src_row;
+                            
+                            curr_src_row = get_src_row(row_idx, mat_width);
+                            next_src_row = get_src_row(row_idx + 1, mat_width);
+                            
+                            if (next_src_row != curr_src_row) begin
+                                // Read new source row
+                                state <= S_READ_ROW;
+                                ar_valid <= 1'b1;
+                                ar_addr <= src_addr + (next_src_row * mat_width * 4);
+                                ar_len <= mat_width - 1;
+                                r_ready <= 1'b1;
+                                col_idx <= 6'd0;
+                            end else begin
+                                // Same source row, just write again
+                                aw_valid <= 1'b1;
+                                aw_addr <= dst_addr + ((row_idx + 1) * (mat_width + 2) * 4);
+                                aw_len <= mat_width + 1;
+                            end
                         end
                     end
                 end
-            end
-            
-            S_DONE: begin
-                if (bvalid_i && b_ready) begin
-                    b_ready_n = 1'b0;
+                
+                S_DONE: begin
+                    done <= 1'b1;
+                    if (!start_i) begin
+                        state <= S_IDLE;
+                    end
                 end
-                done_n = 1'b1;
-                if (!start_i) begin
-                    state_n = S_IDLE;
-                    // done_n remains 1'b1 when going to IDLE
-                end
-            end
-        endcase
+            endcase
+        end
     end
 
-endmodule
+endmodule 
