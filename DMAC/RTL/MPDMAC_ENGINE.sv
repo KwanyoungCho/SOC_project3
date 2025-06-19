@@ -170,6 +170,12 @@ module MPDMAC_ENGINE
             
             // Return address offset from source base
             get_mirrored_addr = ((mirrored_r - 1) * width + (mirrored_c - 1)) * 4;
+            
+            // Debug output for boundary cases
+            if (src_r < 1 || src_r > width || src_c < 1 || src_c > width) begin
+                $display("[DEBUG] get_mirrored_addr: src(%d,%d) -> mirrored(%d,%d) offset=%h", 
+                         src_r, src_c, mirrored_r, mirrored_c, get_mirrored_addr);
+            end
         end
     endfunction
     
@@ -227,13 +233,24 @@ module MPDMAC_ENGINE
             rel_r = src_r - center_row;
             rel_c = src_c - center_col;
             
+            // Debug for edge cases
+            if (out_r >= width || out_c >= width) begin
+                $display("[DEBUG] calc_output_value: out(%d,%d) -> src(%d,%d) -> rel(%d,%d) vs center(%d,%d)", 
+                         out_r, out_c, src_r, src_c, rel_r, rel_c, center_row, center_col);
+            end
+            
             // Check if within 3x3 buffer range
             if (rel_r >= -1 && rel_r <= 1 && rel_c >= -1 && rel_c <= 1) begin
                 // Convert to buffer index and get value
                 calc_output_value = buffer_3x3[(rel_r + 1) * 3 + (rel_c + 1)];
+                if (out_r >= width || out_c >= width) begin
+                    $display("[DEBUG] Buffer access: index=%d, value=%d", (rel_r + 1) * 3 + (rel_c + 1), calc_output_value);
+                end
             end else begin
                 // Should not happen in correct implementation
                 calc_output_value = 32'd0;
+                $display("[DEBUG] ERROR: out_of_range out(%d,%d) rel(%d,%d) center(%d,%d)", 
+                         out_r, out_c, rel_r, rel_c, center_row, center_col);
             end
         end
     endfunction
@@ -294,6 +311,8 @@ module MPDMAC_ENGINE
                         center_row <= 7'd1;
                         center_col <= 7'd1;
                         
+                        $display("[DEBUG] Starting DMA: src=%h, dst=%h, width=%d", src_addr_i, dst_addr_i, mat_width_i);
+                        
                         state <= S_READ_REQ;
                         read_count <= 4'd0;
                         burst_count <= 4'd0;
@@ -313,12 +332,16 @@ module MPDMAC_ENGINE
                         
                         read_addr_offset = get_mirrored_addr(row_r, base_c, mat_width);
                         
+                        $display("[DEBUG] Read REQ: block(%d,%d) center(%d,%d) reading row %d from pos(%d,%d) addr=%h", 
+                                 block_row, block_col, center_row, center_col, read_count/3, row_r, base_c, src_addr + read_addr_offset);
+                        
                         ar_valid <= 1'b1;
                         ar_addr <= src_addr + read_addr_offset;
                         burst_count <= 4'd2; // 3 beats: 0, 1, 2
                         
                         state <= S_READ_DATA;
                     end else if (read_count >= 9) begin
+                        $display("[DEBUG] All 3x3 data read, moving to PREPARE");
                         state <= S_PREPARE_BLOCK;
                     end
                 end
@@ -331,6 +354,7 @@ module MPDMAC_ENGINE
                     
                     if (r_handshake) begin
                         buffer_3x3[read_count] <= rdata_i;
+                        $display("[DEBUG] Read DATA: buffer[%d] = %d (0x%h)", read_count, rdata_i, rdata_i);
                         read_count <= read_count + 1;
                         burst_count <= burst_count - 1;
                         
@@ -347,6 +371,17 @@ module MPDMAC_ENGINE
                     output_block[1] <= calc_output_value(block_row, block_col + 1, mat_width);
                     output_block[2] <= calc_output_value(block_row + 1, block_col, mat_width);
                     output_block[3] <= calc_output_value(block_row + 1, block_col + 1, mat_width);
+                    
+                    $display("[DEBUG] PREPARE: block(%d,%d) center(%d,%d)", block_row, block_col, center_row, center_col);
+                    $display("[DEBUG] Output positions: TL(%d,%d) TR(%d,%d) BL(%d,%d) BR(%d,%d)",
+                             block_row, block_col, block_row, block_col+1, 
+                             block_row+1, block_col, block_row+1, block_col+1);
+                    
+                    // Print 3x3 buffer for debugging
+                    $display("[DEBUG] 3x3 Buffer:");
+                    $display("  %d %d %d", buffer_3x3[0], buffer_3x3[1], buffer_3x3[2]);
+                    $display("  %d %d %d", buffer_3x3[3], buffer_3x3[4], buffer_3x3[5]);
+                    $display("  %d %d %d", buffer_3x3[6], buffer_3x3[7], buffer_3x3[8]);
                     
                     state <= S_WRITE_REQ;
                     write_count <= 2'd0;
@@ -365,6 +400,14 @@ module MPDMAC_ENGINE
                             2'd3: aw_addr <= calc_output_addr(block_row + 1, block_col + 1, mat_width);   // BR
                         endcase
                         
+                        $display("[DEBUG] Write REQ[%d]: addr=%h data=%d", 
+                                 write_count, 
+                                 (write_count == 0) ? calc_output_addr(block_row, block_col, mat_width) :
+                                 (write_count == 1) ? calc_output_addr(block_row, block_col + 1, mat_width) :
+                                 (write_count == 2) ? calc_output_addr(block_row + 1, block_col, mat_width) :
+                                                      calc_output_addr(block_row + 1, block_col + 1, mat_width),
+                                 output_block[write_count]);
+                        
                         state <= S_WRITE_DATA;
                     end
                 end
@@ -376,6 +419,8 @@ module MPDMAC_ENGINE
                         w_data <= output_block[write_count];
                         w_last <= 1'b1;  // Single beat transaction
                         b_ready <= 1'b1;
+                        
+                        $display("[DEBUG] Write DATA[%d]: sending data=%d", write_count, output_block[write_count]);
                     end
                     
                     if (w_handshake) begin
@@ -389,6 +434,7 @@ module MPDMAC_ENGINE
                         
                         if (write_count == 2'd3) begin
                             // All 4 writes done
+                            $display("[DEBUG] All writes done for block(%d,%d)", block_row, block_col);
                             state <= S_NEXT_BLOCK;
                         end else begin
                             // More writes needed, go back to REQ
@@ -411,6 +457,11 @@ module MPDMAC_ENGINE
                         end else begin
                             center_col <= mat_width;
                         end
+                        
+                        $display("[DEBUG] Moving to next column: block(%d,%d)->(%d,%d) center(%d,%d)->(%d,%d)", 
+                                 block_row, block_col, block_row, block_col + 2,
+                                 center_row, center_col, center_row, 
+                                 (center_col + 2 <= mat_width) ? center_col + 2 : mat_width);
                     end else begin
                         block_col <= 6'd0;
                         center_col <= 7'd1;
@@ -421,12 +472,19 @@ module MPDMAC_ENGINE
                         end else begin
                             center_row <= mat_width;
                         end
+                        
+                        $display("[DEBUG] Moving to next row: block(%d,%d)->(%d,0) center(%d,%d)->(%d,1)", 
+                                 block_row, block_col, block_row + 2,
+                                 center_row, center_col,
+                                 (center_row + 2 <= mat_width) ? center_row + 2 : mat_width);
                     end
                     
                     if (block_row > mat_width) begin
+                        $display("[DEBUG] All blocks completed! Going to IDLE");
                         state <= S_IDLE;
                         done <= 1'b1;
                     end else begin
+                        $display("[DEBUG] Starting next block read");
                         state <= S_READ_REQ;
                         read_count <= 4'd0;
                         burst_count <= 4'd0;
