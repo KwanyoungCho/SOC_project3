@@ -57,14 +57,16 @@ module MPDMAC_ENGINE
 );
 
     // State Machine
-    localparam S_IDLE           = 4'd0;
-    localparam S_READ_3x3       = 4'd1;
-    localparam S_PREPARE_BLOCK  = 4'd2;
-    localparam S_WRITE_BURST    = 4'd3;
-    localparam S_NEXT_BLOCK     = 4'd4;
-    localparam S_DONE           = 4'd5;
+    localparam S_IDLE           = 3'd0;
+    localparam S_READ_REQ       = 3'd1;
+    localparam S_READ_DATA      = 3'd2;
+    localparam S_PREPARE_BLOCK  = 3'd3;
+    localparam S_WRITE_REQ      = 3'd4;
+    localparam S_WRITE_DATA     = 3'd5;
+    localparam S_WRITE_RESP     = 3'd6;
+    localparam S_NEXT_BLOCK     = 3'd7;
 
-    reg [3:0] state;
+    reg [2:0] state;
     
     // Configuration registers
     reg [31:0] src_addr;
@@ -73,26 +75,24 @@ module MPDMAC_ENGINE
     reg        done;
     
     // Current 2x2 block position in output matrix (0-based)
-    reg [5:0]  block_row;  // 0, 2, 4, ... (width+2-2)
-    reg [5:0]  block_col;  // 0, 2, 4, ... (width+2-2)
+    reg [5:0]  block_row;  
+    reg [5:0]  block_col;  
     
     // 3x3 buffer for current region
-    reg [31:0] buffer_3x3 [0:8];  // 9 elements: [0][1][2]
-                                  //             [3][4][5]
-                                  //             [6][7][8]
+    reg [31:0] buffer_3x3 [0:8];  
     
     // Current center position in source matrix (1-based)
-    reg signed [6:0] center_row;  // Can be negative for padding
-    reg signed [6:0] center_col;  // Can be negative for padding
+    reg signed [6:0] center_row;  
+    reg signed [6:0] center_col;  
     
     // Read state
     reg [3:0]  read_count;
-    reg [3:0]  read_needed;
-    reg        reading_active;
+    reg [3:0]  burst_count;
+    reg [31:0] current_read_addr;
     
-    // Write state for burst
+    // Write state 
     reg [1:0]  write_count;
-    reg [31:0] write_base_addr;
+    reg [31:0] current_write_addr;
     
     // AXI control signals
     reg        ar_valid;
@@ -122,7 +122,7 @@ module MPDMAC_ENGINE
     // AXI AR channel
     assign arid_o = 4'd0;
     assign araddr_o = ar_addr;
-    assign arlen_o = 4'd2;      // Burst of 3 for row-based reading
+    assign arlen_o = 4'd2;      // Burst of 3 for each row
     assign arsize_o = 3'b010;   // 4 bytes
     assign arburst_o = 2'b01;   // INCR
     assign arvalid_o = ar_valid;
@@ -131,7 +131,7 @@ module MPDMAC_ENGINE
     // AXI AW channel  
     assign awid_o = 4'd0;
     assign awaddr_o = aw_addr;
-    assign awlen_o = 4'd0;      // Single write per transaction (but pipelined)
+    assign awlen_o = 4'd0;      // Single transaction per write
     assign awsize_o = 3'b010;   // 4 bytes
     assign awburst_o = 2'b01;   // INCR
     assign awvalid_o = aw_valid;
@@ -264,8 +264,11 @@ module MPDMAC_ENGINE
             center_col <= 7'd0;
             
             read_count <= 4'd0;
-            read_needed <= 4'd9;
-            reading_active <= 1'b0;
+            burst_count <= 4'd0;
+            current_read_addr <= 32'd0;
+            
+            write_count <= 2'd0;
+            current_write_addr <= 32'd0;
             
             ar_valid <= 1'b0;
             ar_addr <= 32'd0;
@@ -288,171 +291,145 @@ module MPDMAC_ENGINE
                         block_row <= 6'd0;
                         block_col <= 6'd0;
                         
-                        // Start with center at (1,1) for first 2x2 block at (0,0)
                         center_row <= 7'd1;
                         center_col <= 7'd1;
                         
-                        state <= S_READ_3x3;
+                        state <= S_READ_REQ;
                         read_count <= 4'd0;
-                        read_needed <= 4'd9;
-                        reading_active <= 1'b0;
+                        burst_count <= 4'd0;
                     end else begin
                         done <= 1'b1;
                     end
                 end
                 
-                S_READ_3x3: begin
-                    if (!reading_active) begin
-                        // Read row by row with burst (3 elements per row)
-                        reg signed [6:0] row_base_r, row_base_c;
+                S_READ_REQ: begin
+                    if (!ar_valid && (read_count < 9)) begin
+                        // Calculate address for next 3-element burst
+                        reg signed [6:0] row_r, base_c;
                         reg [31:0] read_addr_offset;
                         
-                        // Calculate base position for current row
-                        row_base_r = center_row - 1 + (read_count / 3);
-                        row_base_c = center_col - 1;
+                        row_r = center_row - 1 + (read_count / 3);
+                        base_c = center_col - 1;
                         
-                        // Calculate read address with mirroring for leftmost element
-                        read_addr_offset = get_mirrored_addr(row_base_r, row_base_c, mat_width);
+                        read_addr_offset = get_mirrored_addr(row_r, base_c, mat_width);
                         
                         ar_valid <= 1'b1;
                         ar_addr <= src_addr + read_addr_offset;
-                        r_ready <= 1'b1;
-                        reading_active <= 1'b1;
+                        burst_count <= 4'd2; // 3 beats: 0, 1, 2
+                        
+                        state <= S_READ_DATA;
+                    end else if (read_count >= 9) begin
+                        state <= S_PREPARE_BLOCK;
                     end
-                    
+                end
+                
+                S_READ_DATA: begin
                     if (ar_handshake) begin
                         ar_valid <= 1'b0;
+                        r_ready <= 1'b1;
                     end
                     
                     if (r_handshake) begin
                         buffer_3x3[read_count] <= rdata_i;
                         read_count <= read_count + 1;
+                        burst_count <= burst_count - 1;
                         
-                        // Check if we've read all 3 elements of current row
-                        if ((read_count % 3) == 2) begin
-                            // End of row burst, reset for next row
-                            reading_active <= 1'b0;
+                        if (rlast_i) begin
                             r_ready <= 1'b0;
-                        end
-                        
-                        if (read_count == read_needed - 1) begin
-                            // All 3x3 data read, prepare 2x2 block
-                            state <= S_PREPARE_BLOCK;
-                            read_count <= 4'd0;
-                            reading_active <= 1'b0;
-                            r_ready <= 1'b0;
+                            state <= S_READ_REQ;
                         end
                     end
                 end
                 
                 S_PREPARE_BLOCK: begin
-                    // Calculate 2x2 block values with mirror padding
-                    output_block[0] <= calc_output_value(block_row, block_col, mat_width);         // TL
-                    output_block[1] <= calc_output_value(block_row, block_col + 1, mat_width);     // TR
-                    output_block[2] <= calc_output_value(block_row + 1, block_col, mat_width);     // BL
-                    output_block[3] <= calc_output_value(block_row + 1, block_col + 1, mat_width); // BR
+                    // Calculate 2x2 block values
+                    output_block[0] <= calc_output_value(block_row, block_col, mat_width);
+                    output_block[1] <= calc_output_value(block_row, block_col + 1, mat_width);
+                    output_block[2] <= calc_output_value(block_row + 1, block_col, mat_width);
+                    output_block[3] <= calc_output_value(block_row + 1, block_col + 1, mat_width);
                     
-                    state <= S_WRITE_BURST;
+                    state <= S_WRITE_REQ;
                     write_count <= 2'd0;
-                    
-                    // Start write transaction for TL
-                    aw_valid <= 1'b1;
-                    aw_addr <= calc_output_addr(block_row, block_col, mat_width);  // TL address
+                    current_write_addr <= calc_output_addr(block_row, block_col, mat_width);
                 end
                 
-                S_WRITE_BURST: begin
+                S_WRITE_REQ: begin
+                    if (!aw_valid) begin
+                        aw_valid <= 1'b1;
+                        
+                        // Calculate address for current write position (TL, TR, BL, BR)
+                        case (write_count)
+                            2'd0: aw_addr <= calc_output_addr(block_row, block_col, mat_width);           // TL
+                            2'd1: aw_addr <= calc_output_addr(block_row, block_col + 1, mat_width);       // TR
+                            2'd2: aw_addr <= calc_output_addr(block_row + 1, block_col, mat_width);       // BL
+                            2'd3: aw_addr <= calc_output_addr(block_row + 1, block_col + 1, mat_width);   // BR
+                        endcase
+                        
+                        state <= S_WRITE_DATA;
+                    end
+                end
+                
+                S_WRITE_DATA: begin
                     if (aw_handshake) begin
                         aw_valid <= 1'b0;
                         w_valid <= 1'b1;
+                        w_data <= output_block[write_count];
+                        w_last <= 1'b1;  // Single beat transaction
                         b_ready <= 1'b1;
-                        
-                        case (write_count)
-                            2'd0: begin
-                                w_data <= output_block[0];  // TL
-                                w_last <= 1'b0;
-                            end
-                            2'd1: begin
-                                w_data <= output_block[1];  // TR
-                                w_last <= 1'b0;
-                            end
-                            2'd2: begin
-                                w_data <= output_block[2];  // BL
-                                w_last <= 1'b0;
-                            end
-                            2'd3: begin
-                                w_data <= output_block[3];  // BR
-                                w_last <= 1'b1;
-                            end
-                        endcase
                     end
                     
                     if (w_handshake) begin
+                        w_valid <= 1'b0;
+                        w_last <= 1'b0;
+                    end
+                    
+                    if (b_handshake) begin
+                        b_ready <= 1'b0;
                         write_count <= write_count + 1;
                         
                         if (write_count == 2'd3) begin
-                            // Last write data sent
-                            w_valid <= 1'b0;
-                            w_last <= 1'b0;
+                            // All 4 writes done
+                            state <= S_NEXT_BLOCK;
                         end else begin
-                            // More data to write, start next address
-                            case (write_count)
-                                2'd0: aw_addr <= calc_output_addr(block_row, block_col + 1, mat_width);     // TR
-                                2'd1: aw_addr <= calc_output_addr(block_row + 1, block_col, mat_width);     // BL
-                                2'd2: aw_addr <= calc_output_addr(block_row + 1, block_col + 1, mat_width); // BR
-                            endcase
-                            aw_valid <= 1'b1;
+                            // More writes needed, go back to REQ
+                            state <= S_WRITE_REQ;
                         end
                     end
-                    
-                    if (b_handshake && write_count == 2'd3) begin
-                        b_ready <= 1'b0;
-                        state <= S_NEXT_BLOCK;
-                    end
+                end
+                
+                S_WRITE_RESP: begin
+                    // This state is no longer needed for single transactions
+                    state <= S_NEXT_BLOCK;
                 end
                 
                 S_NEXT_BLOCK: begin
                     // Move to next 2x2 block
-                    // Output matrix is (width+2) x (width+2), so we need blocks at 0,2,4,...,width
-                    // For width=8, we need blocks at columns 0,2,4,6,8
-                    if (block_col + 2 <= mat_width) begin  // Continue if next block position is valid
+                    if (block_col + 2 <= mat_width) begin
                         block_col <= block_col + 2;
-                        // Keep center within source matrix bounds (1 to width)
                         if (center_col + 2 <= mat_width) begin
                             center_col <= center_col + 2;
                         end else begin
-                            center_col <= mat_width;  // Clamp to last valid column
+                            center_col <= mat_width;
                         end
                     end else begin
-                        // End of row, move to next row
                         block_col <= 6'd0;
                         center_col <= 7'd1;
                         
-                        // Move to next row
                         block_row <= block_row + 2;
-                        // Keep center within source matrix bounds (1 to width)
                         if (center_row + 2 <= mat_width) begin
                             center_row <= center_row + 2;
                         end else begin
-                            center_row <= mat_width;  // Clamp to last valid row
+                            center_row <= mat_width;
                         end
                     end
                     
-                    // Check if done - we need to process all blocks including block_row = width
-                    // After incrementing from block_row = width, it becomes width+2 > width
-                    if (block_row > mat_width) begin  
-                        state <= S_DONE;
-                    end else begin
-                        state <= S_READ_3x3;
-                        read_count <= 4'd0;
-                        read_needed <= 4'd9;
-                        reading_active <= 1'b0;
-                    end
-                end
-                
-                S_DONE: begin
-                    done <= 1'b1;
-                    if (!start_i) begin
+                    if (block_row > mat_width) begin
                         state <= S_IDLE;
+                        done <= 1'b1;
+                    end else begin
+                        state <= S_READ_REQ;
+                        read_count <= 4'd0;
+                        burst_count <= 4'd0;
                     end
                 end
             endcase
