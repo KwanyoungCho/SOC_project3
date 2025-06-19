@@ -57,15 +57,14 @@ module MPDMAC_ENGINE
 );
 
     // State Machine
-    localparam S_IDLE           = 3'd0;
-    localparam S_READ_ROW       = 3'd1;
-    localparam S_WRITE_TL       = 3'd2;
-    localparam S_WRITE_TR       = 3'd3;
-    localparam S_WRITE_BL       = 3'd4;
-    localparam S_WRITE_BR       = 3'd5;
-    localparam S_DONE           = 3'd6;
+    localparam S_IDLE           = 4'd0;
+    localparam S_READ_3x3       = 4'd1;
+    localparam S_PREPARE_BLOCK  = 4'd2;
+    localparam S_WRITE_BURST    = 4'd3;
+    localparam S_NEXT_BLOCK     = 4'd4;
+    localparam S_DONE           = 4'd5;
 
-    reg [2:0] state;
+    reg [3:0] state;
     
     // Configuration registers
     reg [31:0] src_addr;
@@ -73,24 +72,28 @@ module MPDMAC_ENGINE
     reg [5:0]  mat_width;
     reg        done;
     
-    // Current position in output matrix (0-based, top-left of 2x2 block)
-    reg [5:0]  out_row;     
-    reg [5:0]  out_col;     
+    // Current 2x2 block position in output matrix (0-based)
+    reg [5:0]  block_row;  // 0, 2, 4, ... (width+2-2)
+    reg [5:0]  block_col;  // 0, 2, 4, ... (width+2-2)
     
-    // Source data cache - store 2 rows
-    reg [31:0] src_row0 [0:63];  // Current row
-    reg [31:0] src_row1 [0:63];  // Next row  
-    reg        row0_valid;
-    reg        row1_valid;
-    reg [5:0]  cached_row;       // Which source row is in row0 (0-based)
+    // 3x3 buffer for current region
+    reg [31:0] buffer_3x3 [0:8];  // 9 elements: [0][1][2]
+                                  //             [3][4][5]
+                                  //             [6][7][8]
+    
+    // Current center position in source matrix (1-based)
+    reg signed [6:0] center_row;  // Can be negative for padding
+    reg signed [6:0] center_col;  // Can be negative for padding
+    
+    // Read state
+    reg [3:0]  read_count;
+    reg [3:0]  read_needed;
+    reg        reading_active;
     
     // AXI control signals
     reg        ar_valid;
     reg [31:0] ar_addr;
-    reg [5:0]  ar_len;
     reg        r_ready;
-    reg [5:0]  read_cnt;
-    reg        reading_row1;
     
     reg        aw_valid;
     reg [31:0] aw_addr;
@@ -98,9 +101,10 @@ module MPDMAC_ENGINE
     reg [31:0] w_data;
     reg        w_last;
     reg        b_ready;
+    reg [1:0]  write_count;
     
-    // 2x2 block data
-    reg [31:0] block_data [0:3];  // TL, TR, BL, BR
+    // Output data for 2x2 block
+    reg [31:0] output_block [0:3];  // TL, TR, BL, BR
     
     // Handshake signals
     wire ar_handshake = ar_valid & arready_i;
@@ -115,7 +119,7 @@ module MPDMAC_ENGINE
     // AXI AR channel
     assign arid_o = 4'd0;
     assign araddr_o = ar_addr;
-    assign arlen_o = ar_len[3:0];
+    assign arlen_o = 4'd0;      // Single read
     assign arsize_o = 3'b010;   // 4 bytes
     assign arburst_o = 2'b01;   // INCR
     assign arvalid_o = ar_valid;
@@ -124,7 +128,7 @@ module MPDMAC_ENGINE
     // AXI AW channel  
     assign awid_o = 4'd0;
     assign awaddr_o = aw_addr;
-    assign awlen_o = 4'd0;      // Single write transaction
+    assign awlen_o = 4'd3;      // 4 transfers (2x2 block)
     assign awsize_o = 3'b010;   // 4 bytes
     assign awburst_o = 2'b01;   // INCR
     assign awvalid_o = aw_valid;
@@ -137,97 +141,82 @@ module MPDMAC_ENGINE
     assign wvalid_o = w_valid;
     assign bready_o = b_ready;
     
-    // 출력 좌표를 소스 행으로 변환 (미러 패딩 적용)
-    function [5:0] get_source_row;
-        input [5:0] out_r;
+    // 3x3 버퍼에서 미러 패딩된 값 계산
+    function [31:0] get_mirrored_value;
+        input signed [6:0] src_r;  // 1-based source row
+        input signed [6:0] src_c;  // 1-based source col
         input [5:0] width;
+        reg signed [6:0] mirrored_r, mirrored_c;
         begin
+            // Mirror padding logic
+            if (src_r < 1) begin
+                mirrored_r = 1;  // Top padding: mirror from row 1
+            end else if (src_r > width) begin
+                mirrored_r = width;  // Bottom padding: mirror from last row
+            end else begin
+                mirrored_r = src_r;  // Normal region
+            end
+            
+            if (src_c < 1) begin
+                mirrored_c = 1;  // Left padding: mirror from col 1
+            end else if (src_c > width) begin
+                mirrored_c = width;  // Right padding: mirror from last col
+            end else begin
+                mirrored_c = src_c;  // Normal region
+            end
+            
+            // Return the mirrored coordinates (for address calculation)
+            // We'll use this for reading from source matrix
+            get_mirrored_value = ((mirrored_r - 1) * width + (mirrored_c - 1)) * 4;  // Address offset
+        end
+    endfunction
+    
+    // 3x3 버퍼의 특정 위치에서 값 읽기
+    function [31:0] get_buffer_value;
+        input signed [6:0] relative_r;  // -1, 0, 1 relative to center
+        input signed [6:0] relative_c;  // -1, 0, 1 relative to center
+        reg [3:0] buf_idx;
+        begin
+            // Convert relative position to buffer index
+            // Buffer layout: [0][1][2]  <- (center_r-1)
+            //               [3][4][5]  <- (center_r)
+            //               [6][7][8]  <- (center_r+1)
+            buf_idx = (relative_r + 1) * 3 + (relative_c + 1);
+            get_buffer_value = buffer_3x3[buf_idx];
+        end
+    endfunction
+    
+    // 출력 매트릭스의 특정 위치에 대한 값 계산 (미러 패딩 적용)
+    function [31:0] calc_output_value;
+        input [5:0] out_r;  // 0-based output row
+        input [5:0] out_c;  // 0-based output col
+        input [5:0] width;
+        reg signed [6:0] src_r, src_c;  // 1-based source coordinates
+        reg signed [6:0] rel_r, rel_c;  // Relative to center
+        begin
+            // Convert output coordinates to source coordinates (1-based)
             if (out_r == 0) begin
-                get_source_row = 0;  // 상단 패딩: row 0에서 미러 (1st row)
+                src_r = 1;  // Top padding
             end else if (out_r == width + 1) begin
-                get_source_row = width - 1;  // 하단 패딩: row width-1에서 미러 (last row) 
+                src_r = width;  // Bottom padding
             end else begin
-                get_source_row = out_r - 1;  // 일반 영역: -1 (0-based)
+                src_r = out_r;  // out_r is 1-based for internal matrix
             end
-        end
-    endfunction
-    
-    // 출력 좌표를 소스 열로 변환 (미러 패딩 적용)  
-    function [5:0] get_source_col;
-        input [5:0] out_c;
-        input [5:0] width;
-        begin
+            
             if (out_c == 0) begin
-                get_source_col = 0;  // 좌측 패딩: col 0에서 미러 (1st col)
+                src_c = 1;  // Left padding
             end else if (out_c == width + 1) begin
-                get_source_col = width - 1;  // 우측 패딩: col width-1에서 미러 (last col)
+                src_c = width;  // Right padding
             end else begin
-                get_source_col = out_c - 1;  // 일반 영역: -1 (0-based)
+                src_c = out_c;  // out_c is 1-based for internal matrix
             end
-        end
-    endfunction
-    
-    // 2x2 블록의 특정 위치에서 미러 패딩된 값 가져오기
-    function [31:0] get_padded_value;
-        input [5:0] out_r;
-        input [5:0] out_c;
-        input [5:0] width;
-        input [1:0] rel_r;  // 2x2 블록 내 상대 행 (0 or 1)
-        input [1:0] rel_c;  // 2x2 블록 내 상대 열 (0 or 1)
-        reg [5:0] abs_r, abs_c;
-        reg [5:0] src_r, src_c;
-        begin
-            // 절대 출력 좌표 계산
-            abs_r = out_r + rel_r;
-            abs_c = out_c + rel_c;
             
-            // 미러 패딩 적용하여 소스 좌표 계산
-            src_r = get_source_row(abs_r, width);
-            src_c = get_source_col(abs_c, width);
+            // Calculate relative position to current center
+            rel_r = src_r - center_row;
+            rel_c = src_c - center_col;
             
-            // 캐시에서 값 가져오기
-            if (src_r == cached_row) begin
-                get_padded_value = src_row0[src_c];  // 0-based indexing for array
-            end else if (src_r == cached_row + 1) begin
-                get_padded_value = src_row1[src_c];  // 0-based indexing for array
-            end else begin
-                get_padded_value = 32'd0;  // Error case
-            end
-        end
-    endfunction
-    
-    // 현재 2x2 블록에 필요한 소스 행들이 캐시되어 있는지 확인
-    function need_read_source;
-        input [5:0] out_r;
-        input [5:0] out_c;
-        input [5:0] width;
-        reg [5:0] src_r0, src_r1;
-        begin
-            // 출력 위치에 대응되는 소스 행 계산 (미러 패딩 적용)
-            src_r0 = get_source_row(out_r, width);
-            src_r1 = get_source_row(out_r + 1, width);
-            
-            // 필요한 행들이 캐시되어 있지 않으면 읽기 필요
-            need_read_source = (!row0_valid || cached_row != src_r0) || 
-                              (!row1_valid || (src_r1 != src_r0 && cached_row + 1 != src_r1));
-        end
-    endfunction
-    
-    // 2x2 블록 요소의 주소 계산
-    function [31:0] calc_element_addr;
-        input [5:0] out_r;
-        input [5:0] out_c;
-        input [5:0] width;
-        input [1:0] rel_r;  // 2x2 블록 내 상대 행 (0 or 1)
-        input [1:0] rel_c;  // 2x2 블록 내 상대 열 (0 or 1)
-        reg [5:0] abs_r, abs_c;
-        begin
-            // 절대 출력 좌표 계산
-            abs_r = out_r + rel_r;
-            abs_c = out_c + rel_c;
-            
-            // 출력 매트릭스 크기: (width+2) x (width+2) 
-            calc_element_addr = dst_addr + (abs_r * (width + 2) + abs_c) * 4;
+            // Get value from buffer
+            calc_output_value = get_buffer_value(rel_r, rel_c);
         end
     endfunction
     
@@ -240,18 +229,18 @@ module MPDMAC_ENGINE
             mat_width <= 6'd0;
             done <= 1'b1;
             
-            out_row <= 6'd0;
-            out_col <= 6'd0;
-            row0_valid <= 1'b0;
-            row1_valid <= 1'b0;
-            cached_row <= 6'd0;
+            block_row <= 6'd0;
+            block_col <= 6'd0;
+            center_row <= 7'd0;
+            center_col <= 7'd0;
+            
+            read_count <= 4'd0;
+            read_needed <= 4'd9;  // Read 3x3 = 9 elements
+            reading_active <= 1'b0;
             
             ar_valid <= 1'b0;
             ar_addr <= 32'd0;
-            ar_len <= 6'd0;
             r_ready <= 1'b0;
-            read_cnt <= 6'd0;
-            reading_row1 <= 1'b0;
             
             aw_valid <= 1'b0;
             aw_addr <= 32'd0;
@@ -259,6 +248,7 @@ module MPDMAC_ENGINE
             w_data <= 32'd0;
             w_last <= 1'b0;
             b_ready <= 1'b0;
+            write_count <= 2'd0;
         end else begin
             case (state)
                 S_IDLE: begin
@@ -267,226 +257,132 @@ module MPDMAC_ENGINE
                         src_addr <= src_addr_i;
                         dst_addr <= dst_addr_i;
                         mat_width <= mat_width_i;
-                        out_row <= 6'd0;
-                        out_col <= 6'd0;
-                        row0_valid <= 1'b0;
-                        row1_valid <= 1'b0;
+                        block_row <= 6'd0;
+                        block_col <= 6'd0;
                         
-                        // 첫 번째 블록을 위해 첫 두 행 읽기 시작
-                        state <= S_READ_ROW;
-                        ar_valid <= 1'b1;
-                        ar_addr <= src_addr_i;  // 소스 매트릭스 첫 번째 행
-                        ar_len <= mat_width_i - 1;  // AXI length = actual - 1
-                        r_ready <= 1'b1;
-                        read_cnt <= 6'd0;
-                        reading_row1 <= 1'b0;
-                        cached_row <= 6'd0;  // 0-based index of row being read
+                        // Start with center at (1,1) for first 2x2 block at (0,0)
+                        center_row <= 7'd1;
+                        center_col <= 7'd1;
+                        
+                        state <= S_READ_3x3;
+                        read_count <= 4'd0;
+                        read_needed <= 4'd9;  // Read 3x3 = 9 elements
+                        reading_active <= 1'b0;
                     end else begin
                         done <= 1'b1;
                     end
                 end
                 
-                S_READ_ROW: begin
+                S_READ_3x3: begin
+                    if (!reading_active) begin
+                        // Start reading the next element of 3x3 region
+                        reg signed [6:0] target_r, target_c;
+                        reg [31:0] read_addr_offset;
+                        
+                        // Calculate which element we're reading (row-major order)
+                        target_r = center_row - 1 + (read_count / 3);
+                        target_c = center_col - 1 + (read_count % 3);
+                        
+                        // Calculate read address with mirroring
+                        read_addr_offset = get_mirrored_value(target_r, target_c, mat_width);
+                        
+                        ar_valid <= 1'b1;
+                        ar_addr <= src_addr + read_addr_offset;
+                        r_ready <= 1'b1;
+                        reading_active <= 1'b1;
+                    end
+                    
                     if (ar_handshake) begin
                         ar_valid <= 1'b0;
                     end
                     
                     if (r_handshake) begin
-                        if (!reading_row1) begin
-                            src_row0[read_cnt] <= rdata_i;
-                        end else begin
-                            src_row1[read_cnt] <= rdata_i;
-                        end
-                        read_cnt <= read_cnt + 1;
+                        buffer_3x3[read_count] <= rdata_i;
+                        read_count <= read_count + 1;
+                        reading_active <= 1'b0;
+                        r_ready <= 1'b0;
                         
-                        if (rlast_i) begin
-                            if (!reading_row1 && cached_row < mat_width - 1) begin
-                                // 첫 번째 행 읽기 완료, 두 번째 행 읽기 시작
-                                row0_valid <= 1'b1;
-                                reading_row1 <= 1'b1;
-                                read_cnt <= 6'd0;
-                                ar_valid <= 1'b1;
-                                ar_addr <= src_addr + (cached_row + 1) * mat_width * 4;  // next row
-                                ar_len <= mat_width - 1;
-                            end else begin
-                                // 두 번째 행 읽기 완료 또는 마지막 행
-                                if (reading_row1) begin
-                                    row1_valid <= 1'b1;
-                                end else begin
-                                    row0_valid <= 1'b1;
-                                end
-                                reading_row1 <= 1'b0;
-                                r_ready <= 1'b0;
-                                read_cnt <= 6'd0;
-                                
-                                // 2x2 블록 데이터 준비
-                                block_data[0] <= get_padded_value(out_row, out_col, mat_width, 2'd0, 2'd0); // TL
-                                block_data[1] <= get_padded_value(out_row, out_col, mat_width, 2'd0, 2'd1); // TR
-                                block_data[2] <= get_padded_value(out_row, out_col, mat_width, 2'd1, 2'd0); // BL
-                                block_data[3] <= get_padded_value(out_row, out_col, mat_width, 2'd1, 2'd1); // BR
-                                
-                                state <= S_WRITE_TL;
-                                aw_valid <= 1'b1;
-                                aw_addr <= calc_element_addr(out_row, out_col, mat_width, 2'd0, 2'd0); // TL
-                            end
+                        if (read_count == read_needed - 1) begin
+                            // All 3x3 data read, prepare 2x2 block
+                            state <= S_PREPARE_BLOCK;
+                            read_count <= 4'd0;
                         end
                     end
                 end
                 
-                S_WRITE_TL: begin
-                    if (aw_handshake) begin
-                        aw_valid <= 1'b0;
-                        w_valid <= 1'b1;
-                        w_data <= block_data[0]; // TL
-                        w_last <= 1'b1;
-                        b_ready <= 1'b1;
-                    end
+                S_PREPARE_BLOCK: begin
+                    // Calculate 2x2 block values with mirror padding
+                    output_block[0] <= calc_output_value(block_row, block_col, mat_width);         // TL
+                    output_block[1] <= calc_output_value(block_row, block_col + 1, mat_width);     // TR
+                    output_block[2] <= calc_output_value(block_row + 1, block_col, mat_width);     // BL
+                    output_block[3] <= calc_output_value(block_row + 1, block_col + 1, mat_width); // BR
                     
-                    if (w_handshake) begin
-                        w_valid <= 1'b0;
-                        w_last <= 1'b0;
-                    end
+                    state <= S_WRITE_BURST;
+                    write_count <= 2'd0;
                     
-                    if (b_handshake) begin
-                        b_ready <= 1'b0;
-                        state <= S_WRITE_TR;
-                        aw_valid <= 1'b1;
-                        aw_addr <= calc_element_addr(out_row, out_col, mat_width, 2'd0, 2'd1); // TR
-                    end
+                    // Start write transaction for 2x2 block
+                    aw_valid <= 1'b1;
+                    aw_addr <= dst_addr + (block_row * (mat_width + 2) + block_col) * 4;  // TL address
                 end
                 
-                S_WRITE_TR: begin
+                S_WRITE_BURST: begin
                     if (aw_handshake) begin
                         aw_valid <= 1'b0;
                         w_valid <= 1'b1;
-                        w_data <= block_data[1]; // TR
-                        w_last <= 1'b1;
+                        w_data <= output_block[0];  // Start with TL
+                        w_last <= 1'b0;
                         b_ready <= 1'b1;
                     end
                     
                     if (w_handshake) begin
-                        w_valid <= 1'b0;
-                        w_last <= 1'b0;
-                    end
-                    
-                    if (b_handshake) begin
-                        b_ready <= 1'b0;
-                        state <= S_WRITE_BL;
-                        aw_valid <= 1'b1;
-                        aw_addr <= calc_element_addr(out_row, out_col, mat_width, 2'd1, 2'd0); // BL
-                    end
-                end
-                
-                S_WRITE_BL: begin
-                    if (aw_handshake) begin
-                        aw_valid <= 1'b0;
-                        w_valid <= 1'b1;
-                        w_data <= block_data[2]; // BL
-                        w_last <= 1'b1;
-                        b_ready <= 1'b1;
-                    end
-                    
-                    if (w_handshake) begin
-                        w_valid <= 1'b0;
-                        w_last <= 1'b0;
-                    end
-                    
-                    if (b_handshake) begin
-                        b_ready <= 1'b0;
-                        state <= S_WRITE_BR;
-                        aw_valid <= 1'b1;
-                        aw_addr <= calc_element_addr(out_row, out_col, mat_width, 2'd1, 2'd1); // BR
-                    end
-                end
-                
-                S_WRITE_BR: begin
-                    if (aw_handshake) begin
-                        aw_valid <= 1'b0;
-                        w_valid <= 1'b1;
-                        w_data <= block_data[3]; // BR
-                        w_last <= 1'b1;
-                        b_ready <= 1'b1;
-                    end
-                    
-                    if (w_handshake) begin
-                        w_valid <= 1'b0;
-                        w_last <= 1'b0;
-                    end
-                    
-                    if (b_handshake) begin
-                        b_ready <= 1'b0;
+                        write_count <= write_count + 1;
                         
-                        // Move to next 2x2 block  
-                        if (out_col + 2 < mat_width + 2) begin
-                            out_col <= out_col + 2;
-                        end else begin
-                            out_col <= 6'd0;
-                            out_row <= out_row + 2;
-                        end
-                        
-                        // Check if done
-                        if ((out_row + 2 >= mat_width + 2) && (out_col + 2 >= mat_width + 2)) begin
-                            state <= S_DONE;
-                        end else begin
-                            // Prepare next block coordinates
-                            reg [5:0] next_row, next_col;
-                            if (out_col + 2 < mat_width + 2) begin
-                                next_row = out_row;
-                                next_col = out_col + 2;
-                            end else begin
-                                next_row = out_row + 2;
-                                next_col = 6'd0;
+                        case (write_count)
+                            2'd0: begin  // Just sent TL, now send TR
+                                w_data <= output_block[1];
+                                w_last <= 1'b0;
                             end
-                            
-                            // Check if we need to read more source data
-                            if (need_read_source(next_row, next_col, mat_width)) begin
-                                reg [5:0] req_row;
-                                req_row = get_source_row(next_row, mat_width);
-                                
-                                state <= S_READ_ROW;
-                                
-                                // Shift cache if needed
-                                if (req_row == cached_row + 1 && cached_row + 1 < mat_width) begin
-                                    // Shift: row1 -> row0, read new row1
-                                    integer i;
-                                    for (i = 0; i < 64; i = i + 1) begin
-                                        src_row0[i] <= src_row1[i];
-                                    end
-                                    row0_valid <= row1_valid;
-                                    row1_valid <= 1'b0;
-                                    cached_row <= cached_row + 1;
-                                    reading_row1 <= 1'b1;
-                                    
-                                    ar_valid <= 1'b1;
-                                    ar_addr <= src_addr + (cached_row + 1) * mat_width * 4;
-                                    ar_len <= mat_width - 1;
-                                    r_ready <= 1'b1;
-                                    read_cnt <= 6'd0;
-                                end else begin
-                                    // Read completely new rows
-                                    row0_valid <= 1'b0;
-                                    row1_valid <= 1'b0;
-                                    cached_row <= req_row;
-                                    reading_row1 <= 1'b0;
-                                    
-                                    ar_valid <= 1'b1;
-                                    ar_addr <= src_addr + req_row * mat_width * 4;
-                                    ar_len <= mat_width - 1;
-                                    r_ready <= 1'b1;
-                                    read_cnt <= 6'd0;
-                                end
-                            end else begin
-                                // Can use cached data - prepare 2x2 block
-                                block_data[0] <= get_padded_value(next_row, next_col, mat_width, 2'd0, 2'd0); // TL
-                                block_data[1] <= get_padded_value(next_row, next_col, mat_width, 2'd0, 2'd1); // TR  
-                                block_data[2] <= get_padded_value(next_row, next_col, mat_width, 2'd1, 2'd0); // BL
-                                block_data[3] <= get_padded_value(next_row, next_col, mat_width, 2'd1, 2'd1); // BR
-                                
-                                state <= S_WRITE_TL;
-                                aw_valid <= 1'b1;
-                                aw_addr <= calc_element_addr(next_row, next_col, mat_width, 2'd0, 2'd0); // TL
+                            2'd1: begin  // Just sent TR, now send BL
+                                w_data <= output_block[2];
+                                w_last <= 1'b0;
                             end
-                        end
+                            2'd2: begin  // Just sent BL, now send BR
+                                w_data <= output_block[3];
+                                w_last <= 1'b1;  // Last transfer
+                            end
+                            2'd3: begin  // Just sent BR
+                                w_valid <= 1'b0;
+                                w_last <= 1'b0;
+                            end
+                        endcase
+                    end
+                    
+                    if (b_handshake) begin
+                        b_ready <= 1'b0;
+                        state <= S_NEXT_BLOCK;
+                    end
+                end
+                
+                S_NEXT_BLOCK: begin
+                    // Move to next 2x2 block
+                    if (block_col + 2 < mat_width + 2) begin
+                        block_col <= block_col + 2;
+                        center_col <= center_col + 2;
+                    end else begin
+                        block_col <= 6'd0;
+                        center_col <= 7'd1;
+                        block_row <= block_row + 2;
+                        center_row <= center_row + 2;
+                    end
+                    
+                    // Check if done
+                    if (block_row + 2 >= mat_width + 2) begin
+                        state <= S_DONE;
+                    end else begin
+                        state <= S_READ_3x3;
+                        read_count <= 4'd0;
+                        read_needed <= 4'd9;
+                        reading_active <= 1'b0;
                     end
                 end
                 
