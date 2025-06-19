@@ -226,13 +226,25 @@ module MPDMAC_ENGINE
             rel_r = src_r - center_row;
             rel_c = src_c - center_col;
             
+            // Debug output for critical positions (row/col 8 and 9)
+            if (out_r >= 8 || out_c >= 8) begin
+                $display("[DEBUG] calc_output_value: out_pos(%0d,%0d) -> src_pos(%0d,%0d) -> rel_pos(%0d,%0d) vs center(%0d,%0d)", 
+                         out_r, out_c, src_r, src_c, rel_r, rel_c, center_row, center_col);
+            end
+            
             // Check if within 3x3 buffer range
             if (rel_r >= -1 && rel_r <= 1 && rel_c >= -1 && rel_c <= 1) begin
                 // Convert to buffer index and get value
                 calc_output_value = buffer_3x3[(rel_r + 1) * 3 + (rel_c + 1)];
+                if (out_r >= 8 || out_c >= 8) begin
+                    $display("[DEBUG] Buffer index: %0d, value: %0d", (rel_r + 1) * 3 + (rel_c + 1), calc_output_value);
+                end
             end else begin
                 // Should not happen in correct implementation
                 calc_output_value = 32'd0;
+                if (out_r >= 8 || out_c >= 8) begin
+                    $display("[DEBUG] ERROR: Position out of buffer range! Setting to 0");
+                end
             end
         end
     endfunction
@@ -291,6 +303,9 @@ module MPDMAC_ENGINE
                         center_row <= 7'd1;
                         center_col <= 7'd1;
                         
+                        $display("[DEBUG] Starting DMA with mat_width=%0d", mat_width_i);
+                        $display("[DEBUG] Initial: block_pos(0,0), center_pos(1,1)");
+                        
                         state <= S_READ_3x3;
                         read_count <= 4'd0;
                         read_needed <= 4'd9;
@@ -343,6 +358,12 @@ module MPDMAC_ENGINE
                     output_block[1] <= calc_output_value(block_row, block_col + 1, mat_width);     // TR
                     output_block[2] <= calc_output_value(block_row + 1, block_col, mat_width);     // BL
                     output_block[3] <= calc_output_value(block_row + 1, block_col + 1, mat_width); // BR
+                    
+                    $display("[DEBUG] Processing block at (%0d,%0d), center=(%0d,%0d)", 
+                             block_row, block_col, center_row, center_col);
+                    $display("[DEBUG] Output positions: TL(%0d,%0d) TR(%0d,%0d) BL(%0d,%0d) BR(%0d,%0d)",
+                             block_row, block_col, block_row, block_col+1, 
+                             block_row+1, block_col, block_row+1, block_col+1);
                     
                     state <= S_WRITE_TL;
                     
@@ -450,8 +471,12 @@ module MPDMAC_ENGINE
                     if (block_col + 2 <= mat_width) begin  // Continue if next block position is valid
                         block_col <= block_col + 2;
                         center_col <= center_col + 2;
+                        $display("[DEBUG] Moving to next column: block_col=%0d->%0d, center_col=%0d->%0d", 
+                                 block_col, block_col + 2, center_col, center_col + 2);
                     end else begin
                         // End of row, move to next row
+                        $display("[DEBUG] End of row. Moving to next row: block_row=%0d->%0d, block_col=%0d->0", 
+                                 block_row, block_row + 2, block_col);
                         block_col <= 6'd0;
                         center_col <= 7'd1;
                         
@@ -463,6 +488,8 @@ module MPDMAC_ENGINE
                     // Check if done - we need to process all blocks including block_row = width
                     // After incrementing from block_row = width, it becomes width+2 > width
                     if (block_row > mat_width) begin  
+                        $display("[DEBUG] All blocks processed. block_row=%0d > mat_width=%0d. Going to DONE.", 
+                                 block_row, mat_width);
                         state <= S_DONE;
                     end else begin
                         state <= S_READ_3x3;
