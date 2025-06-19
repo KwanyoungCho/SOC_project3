@@ -57,247 +57,375 @@ module MPDMAC_ENGINE
 );
     // Design here
 
-    // ----------------------------------------------------------
-    // Parameters and internal signals
-    // ----------------------------------------------------------
+    // State Machine
+    localparam S_IDLE           = 4'd0;
+    localparam S_READ_MATRIX    = 4'd1;
+    localparam S_WRITE_TOP      = 4'd2;
+    localparam S_WRITE_MID      = 4'd3;
+    localparam S_WRITE_BOT      = 4'd4;
+    localparam S_DONE           = 4'd5;
 
-    typedef enum logic [2:0] {
-        S_IDLE  = 3'd0,
-        S_AR    = 3'd1,
-        S_R     = 3'd2,
-        S_AW    = 3'd3,
-        S_W     = 3'd4,
-        S_B     = 3'd5
-    } state_t;
-
-    state_t                  state, state_n;
-
-    reg [31:0]               src_base, dst_base;
-    reg [5:0]                mat_width;
-    reg [5:0]                pad_width;
-
-    reg [5:0]                row, col;
-    reg [5:0]                row_n, col_n;
-
-    reg [31:0]               buffer[1:0][1:0];
-
-    reg [1:0]                ar_cnt, ar_cnt_n;
-    reg [2:0]                rd_cnt, rd_cnt_n;
-    reg [1:0]                aw_cnt, aw_cnt_n;
-    reg [2:0]                wr_cnt, wr_cnt_n;
-    reg [1:0]                b_cnt,  b_cnt_n;
-
-    reg                      done, done_n;
-
-    // ----------------------------------------------------------
-    // Helper function for mirror index
-    // ----------------------------------------------------------
-    function automatic [5:0] mirror_idx(
-        input [5:0] pidx,
-        input [5:0] pad_w,
-        input [5:0] mat_w
-    );
-        if (pidx == 0)
-            mirror_idx = 6'd1;
-        else if (pidx == pad_w - 1)
-            mirror_idx = mat_w - 2;
-        else
-            mirror_idx = pidx - 1;
-    endfunction
-
-    wire        start_trig = start_i & done;
-
-    // ----------------------------------------------------------
-    // sequential logic
-    // ----------------------------------------------------------
-    always_ff @(posedge clk or negedge rst_n) begin
+    reg [3:0] state, state_n;
+    
+    // Internal registers
+    reg [31:0] src_addr, src_addr_n;
+    reg [31:0] dst_addr, dst_addr_n;
+    reg [5:0]  mat_width, mat_width_n;
+    reg [5:0]  row_cnt, row_cnt_n;
+    reg [5:0]  col_cnt, col_cnt_n;
+    reg        done, done_n;
+    
+    // Matrix buffer to store entire matrix (max 32x32)
+    reg [31:0] matrix [0:31][0:31];
+    reg [31:0] matrix_n [0:31][0:31];
+    
+    // Read channel control
+    reg        ar_valid, ar_valid_n;
+    reg [31:0] ar_addr, ar_addr_n;
+    reg [3:0]  ar_len, ar_len_n;
+    reg        r_ready, r_ready_n;
+    reg [5:0]  read_cnt, read_cnt_n;
+    
+    // Write channel control
+    reg        aw_valid, aw_valid_n;
+    reg [31:0] aw_addr, aw_addr_n;
+    reg [3:0]  aw_len, aw_len_n;
+    reg        w_valid, w_valid_n;
+    reg [31:0] w_data, w_data_n;
+    reg        w_last, w_last_n;
+    reg        b_ready, b_ready_n;
+    reg [5:0]  write_cnt, write_cnt_n;
+    reg [5:0]  write_row, write_row_n;
+    reg [5:0]  write_col, write_col_n;
+    
+    // Output assignments
+    assign done_o = done;
+    
+    // AXI AR channel
+    assign arid_o = 4'd0;
+    assign araddr_o = ar_addr;
+    assign arlen_o = ar_len;
+    assign arsize_o = 3'b010; // 4 bytes
+    assign arburst_o = 2'b01; // INCR
+    assign arvalid_o = ar_valid;
+    
+    // AXI R channel
+    assign rready_o = r_ready;
+    
+    // AXI AW channel
+    assign awid_o = 4'd0;
+    assign awaddr_o = aw_addr;
+    assign awlen_o = aw_len;
+    assign awsize_o = 3'b010; // 4 bytes
+    assign awburst_o = 2'b01; // INCR
+    assign awvalid_o = aw_valid;
+    
+    // AXI W channel
+    assign wid_o = 4'd0;
+    assign wdata_o = w_data;
+    assign wstrb_o = 4'hF;
+    assign wlast_o = w_last;
+    assign wvalid_o = w_valid;
+    
+    // AXI B channel
+    assign bready_o = b_ready;
+    
+    // Sequential logic
+    always @(posedge clk) begin
         if (!rst_n) begin
-            state       <= S_IDLE;
-            src_base    <= 32'd0;
-            dst_base    <= 32'd0;
-            mat_width   <= 6'd0;
-            pad_width   <= 6'd0;
-            row         <= 6'd0;
-            col         <= 6'd0;
-            ar_cnt      <= 2'd0;
-            rd_cnt      <= 3'd0;
-            aw_cnt      <= 2'd0;
-            wr_cnt      <= 3'd0;
-            b_cnt       <= 2'd0;
-            buffer[0][0]<= 32'd0;
-            buffer[0][1]<= 32'd0;
-            buffer[1][0]<= 32'd0;
-            buffer[1][1]<= 32'd0;
-            done        <= 1'b1;
-        end else begin
-            state       <= state_n;
-            row         <= row_n;
-            col         <= col_n;
-            ar_cnt      <= ar_cnt_n;
-            rd_cnt      <= rd_cnt_n;
-            aw_cnt      <= aw_cnt_n;
-            wr_cnt      <= wr_cnt_n;
-            b_cnt       <= b_cnt_n;
-            if (state==S_R && rvalid_i)
-                case (rd_cnt)
-                    3'd0: buffer[0][0] <= rdata_i;
-                    3'd1: buffer[0][1] <= rdata_i;
-                    3'd2: buffer[1][0] <= rdata_i;
-                    3'd3: buffer[1][1] <= rdata_i;
-                endcase
-            if (state==S_IDLE && start_trig) begin
-                src_base    <= src_addr_i;
-                dst_base    <= dst_addr_i;
-                mat_width   <= mat_width_i;
-                pad_width   <= mat_width_i + 6'd2;
+            state <= S_IDLE;
+            src_addr <= 32'd0;
+            dst_addr <= 32'd0;
+            mat_width <= 6'd0;
+            row_cnt <= 6'd0;
+            col_cnt <= 6'd0;
+            done <= 1'b0;
+            
+            ar_valid <= 1'b0;
+            ar_addr <= 32'd0;
+            ar_len <= 4'd0;
+            r_ready <= 1'b0;
+            read_cnt <= 6'd0;
+            
+            aw_valid <= 1'b0;
+            aw_addr <= 32'd0;
+            aw_len <= 4'd0;
+            w_valid <= 1'b0;
+            w_data <= 32'd0;
+            w_last <= 1'b0;
+            b_ready <= 1'b0;
+            write_cnt <= 6'd0;
+            write_row <= 6'd0;
+            write_col <= 6'd0;
+            
+            for (integer i = 0; i < 32; i = i + 1) begin
+                for (integer j = 0; j < 32; j = j + 1) begin
+                    matrix[i][j] <= 32'd0;
+                end
             end
-            done        <= done_n;
+        end else begin
+            state <= state_n;
+            src_addr <= src_addr_n;
+            dst_addr <= dst_addr_n;
+            mat_width <= mat_width_n;
+            row_cnt <= row_cnt_n;
+            col_cnt <= col_cnt_n;
+            done <= done_n;
+            
+            ar_valid <= ar_valid_n;
+            ar_addr <= ar_addr_n;
+            ar_len <= ar_len_n;
+            r_ready <= r_ready_n;
+            read_cnt <= read_cnt_n;
+            
+            aw_valid <= aw_valid_n;
+            aw_addr <= aw_addr_n;
+            aw_len <= aw_len_n;
+            w_valid <= w_valid_n;
+            w_data <= w_data_n;
+            w_last <= w_last_n;
+            b_ready <= b_ready_n;
+            write_cnt <= write_cnt_n;
+            write_row <= write_row_n;
+            write_col <= write_col_n;
+            
+            for (integer i = 0; i < 32; i = i + 1) begin
+                for (integer j = 0; j < 32; j = j + 1) begin
+                    matrix[i][j] <= matrix_n[i][j];
+                end
+            end
         end
     end
-
-    // ----------------------------------------------------------
-    // address generation
-    // ----------------------------------------------------------
-    wire [5:0] src_r0 = mirror_idx(row    , pad_width, mat_width);
-    wire [5:0] src_r1 = mirror_idx(row+1 , pad_width, mat_width);
-    wire [5:0] src_c0 = mirror_idx(col    , pad_width, mat_width);
-
-    wire [31:0] src_addr0 = src_base + (((src_r0 * mat_width) + src_c0) << 2);
-    wire [31:0] src_addr1 = src_base + (((src_r1 * mat_width) + src_c0) << 2);
-
-    wire [31:0] dst_addr0  = dst_base + (((row   * pad_width) + col) << 2);
-    wire [31:0] dst_addr1  = dst_base + ((((row+1) * pad_width) + col) << 2);
-
-    // ----------------------------------------------------------
-    // combinational FSM
-    // ----------------------------------------------------------
-    always_comb begin
-        state_n   = state;
-        row_n     = row;
-        col_n     = col;
-        done_n    = done;
-        ar_cnt_n  = ar_cnt;
-        rd_cnt_n  = rd_cnt;
-        aw_cnt_n  = aw_cnt;
-        wr_cnt_n  = wr_cnt;
-        b_cnt_n   = b_cnt;
-
+    
+    // Combinational logic
+    always @(*) begin
+        // Default values
+        state_n = state;
+        src_addr_n = src_addr;
+        dst_addr_n = dst_addr;
+        mat_width_n = mat_width;
+        row_cnt_n = row_cnt;
+        col_cnt_n = col_cnt;
+        done_n = done;
+        
+        ar_valid_n = ar_valid;
+        ar_addr_n = ar_addr;
+        ar_len_n = ar_len;
+        r_ready_n = r_ready;
+        read_cnt_n = read_cnt;
+        
+        aw_valid_n = aw_valid;
+        aw_addr_n = aw_addr;
+        aw_len_n = aw_len;
+        w_valid_n = w_valid;
+        w_data_n = w_data;
+        w_last_n = w_last;
+        b_ready_n = b_ready;
+        write_cnt_n = write_cnt;
+        write_row_n = write_row;
+        write_col_n = write_col;
+        
+        for (integer i = 0; i < 32; i = i + 1) begin
+            for (integer j = 0; j < 32; j = j + 1) begin
+                matrix_n[i][j] = matrix[i][j];
+            end
+        end
+        
         case (state)
             S_IDLE: begin
-                if (start_trig) begin
-                    state_n   = S_AR;
-                    row_n     = 6'd0;
-                    col_n     = 6'd0;
-                    ar_cnt_n  = 2'd0;
-                    rd_cnt_n  = 3'd0;
-                    aw_cnt_n  = 2'd0;
-                    wr_cnt_n  = 3'd0;
-                    b_cnt_n   = 2'd0;
-                    done_n    = 1'b0;
+                done_n = 1'b0;
+                if (start_i) begin
+                    src_addr_n = src_addr_i;
+                    dst_addr_n = dst_addr_i;
+                    mat_width_n = mat_width_i;
+                    row_cnt_n = 6'd0;
+                    col_cnt_n = 6'd0;
+                    read_cnt_n = 6'd0;
+                    state_n = S_READ_MATRIX;
+                    
+                    // Setup first read
+                    ar_valid_n = 1'b1;
+                    ar_addr_n = src_addr_i;
+                    ar_len_n = mat_width_i - 1; // Read one row
+                    r_ready_n = 1'b1;
                 end
             end
-
-            S_AR: begin
-                if (arready_i) begin
-                    if (ar_cnt == 0) begin
-                        ar_cnt_n = 1;
-                    end else begin
-                        ar_cnt_n = 0;
-                        state_n  = S_R;
-                    end
+            
+            S_READ_MATRIX: begin
+                // AR channel handshake
+                if (ar_valid && arready_i) begin
+                    ar_valid_n = 1'b0;
                 end
-            end
-
-            S_R: begin
-                if (rvalid_i) begin
+                
+                // R channel data reception
+                if (rvalid_i && r_ready) begin
+                    matrix_n[row_cnt][col_cnt] = rdata_i;
+                    col_cnt_n = col_cnt + 1;
+                    
                     if (rlast_i) begin
-                        rd_cnt_n = 3'd0;
-                        state_n  = S_AW;
-                    end else begin
-                        rd_cnt_n = rd_cnt + 1;
-                    end
-                end
-            end
-
-            S_AW: begin
-                if (awready_i) begin
-                    if (aw_cnt == 0) begin
-                        aw_cnt_n = 1;
-                    end else begin
-                        aw_cnt_n = 0;
-                        state_n  = S_W;
-                    end
-                end
-            end
-
-            S_W: begin
-                if (wready_i) begin
-                    if (wlast_o) begin
-                        wr_cnt_n = 3'd0;
-                        state_n  = S_B;
-                    end else begin
-                        wr_cnt_n = wr_cnt + 1;
-                    end
-                end
-            end
-
-            S_B: begin
-                if (bvalid_i) begin
-                    if (b_cnt == 0) begin
-                        b_cnt_n = 1;
-                    end else begin
-                        b_cnt_n = 0;
-                        if (row == pad_width-2 && col == pad_width-2) begin
-                            state_n = S_IDLE;
-                            done_n  = 1'b1;
+                        row_cnt_n = row_cnt + 1;
+                        col_cnt_n = 6'd0;
+                        
+                        if (row_cnt == mat_width - 1) begin
+                            // All data read, start writing
+                            r_ready_n = 1'b0;
+                            state_n = S_WRITE_TOP;
+                            write_row_n = 6'd0;
+                            write_col_n = 6'd0;
+                            write_cnt_n = 6'd0;
                         end else begin
-                            if (col == pad_width-2) begin
-                                col_n = 6'd0;
-                                row_n = row + 6'd2;
-                            end else begin
-                                col_n = col + 6'd2;
-                            end
-                            state_n = S_AR;
+                            // Read next row
+                            ar_valid_n = 1'b1;
+                            ar_addr_n = src_addr + ((row_cnt + 1) * mat_width * 4);
+                            ar_len_n = mat_width - 1;
                         end
                     end
                 end
             end
+            
+            S_WRITE_TOP: begin
+                // Write top padding row
+                if (!aw_valid || (aw_valid && awready_i)) begin
+                    aw_valid_n = 1'b1;
+                    aw_addr_n = dst_addr;
+                    aw_len_n = mat_width + 1; // N+2 elements
+                    w_valid_n = 1'b1;
+                    write_cnt_n = 6'd0;
+                    b_ready_n = 1'b1;
+                end
+                
+                if (aw_valid && awready_i) begin
+                    aw_valid_n = 1'b0;
+                end
+                
+                if (w_valid && wready_i) begin
+                    if (write_cnt == 0) begin
+                        // Top-left corner
+                        w_data_n = matrix[1][1];
+                    end else if (write_cnt <= mat_width) begin
+                        // Top edge
+                        w_data_n = matrix[1][write_cnt - 1];
+                    end else begin
+                        // Top-right corner
+                        w_data_n = matrix[1][mat_width - 2];
+                    end
+                    
+                    write_cnt_n = write_cnt + 1;
+                    
+                    if (write_cnt == mat_width + 1) begin
+                        w_last_n = 1'b1;
+                    end else begin
+                        w_last_n = 1'b0;
+                    end
+                    
+                    if (w_last) begin
+                        w_valid_n = 1'b0;
+                        w_last_n = 1'b0;
+                        state_n = S_WRITE_MID;
+                        write_row_n = 6'd0;
+                        write_cnt_n = 6'd0;
+                    end
+                end
+            end
+            
+            S_WRITE_MID: begin
+                // Write middle rows with padding
+                if (!aw_valid || (aw_valid && awready_i)) begin
+                    aw_valid_n = 1'b1;
+                    aw_addr_n = dst_addr + ((write_row + 1) * (mat_width + 2) * 4);
+                    aw_len_n = mat_width + 1;
+                    w_valid_n = 1'b1;
+                    write_cnt_n = 6'd0;
+                end
+                
+                if (aw_valid && awready_i) begin
+                    aw_valid_n = 1'b0;
+                end
+                
+                if (w_valid && wready_i) begin
+                    if (write_cnt == 0) begin
+                        // Left padding
+                        w_data_n = matrix[write_row][1];
+                    end else if (write_cnt <= mat_width) begin
+                        // Original data
+                        w_data_n = matrix[write_row][write_cnt - 1];
+                    end else begin
+                        // Right padding
+                        w_data_n = matrix[write_row][mat_width - 2];
+                    end
+                    
+                    write_cnt_n = write_cnt + 1;
+                    
+                    if (write_cnt == mat_width + 1) begin
+                        w_last_n = 1'b1;
+                    end else begin
+                        w_last_n = 1'b0;
+                    end
+                    
+                    if (w_last) begin
+                        w_valid_n = 1'b0;
+                        w_last_n = 1'b0;
+                        write_row_n = write_row + 1;
+                        write_cnt_n = 6'd0;
+                        
+                        if (write_row == mat_width - 1) begin
+                            state_n = S_WRITE_BOT;
+                            write_cnt_n = 6'd0;
+                        end
+                    end
+                end
+            end
+            
+            S_WRITE_BOT: begin
+                // Write bottom padding row
+                if (!aw_valid || (aw_valid && awready_i)) begin
+                    aw_valid_n = 1'b1;
+                    aw_addr_n = dst_addr + ((mat_width + 1) * (mat_width + 2) * 4);
+                    aw_len_n = mat_width + 1;
+                    w_valid_n = 1'b1;
+                    write_cnt_n = 6'd0;
+                end
+                
+                if (aw_valid && awready_i) begin
+                    aw_valid_n = 1'b0;
+                end
+                
+                if (w_valid && wready_i) begin
+                    if (write_cnt == 0) begin
+                        // Bottom-left corner
+                        w_data_n = matrix[mat_width - 2][1];
+                    end else if (write_cnt <= mat_width) begin
+                        // Bottom edge
+                        w_data_n = matrix[mat_width - 2][write_cnt - 1];
+                    end else begin
+                        // Bottom-right corner
+                        w_data_n = matrix[mat_width - 2][mat_width - 2];
+                    end
+                    
+                    write_cnt_n = write_cnt + 1;
+                    
+                    if (write_cnt == mat_width + 1) begin
+                        w_last_n = 1'b1;
+                    end else begin
+                        w_last_n = 1'b0;
+                    end
+                    
+                    if (w_last) begin
+                        w_valid_n = 1'b0;
+                        w_last_n = 1'b0;
+                        state_n = S_DONE;
+                    end
+                end
+            end
+            
+            S_DONE: begin
+                if (bvalid_i && b_ready) begin
+                    b_ready_n = 1'b0;
+                    done_n = 1'b1;
+                    state_n = S_IDLE;
+                end
+            end
         endcase
     end
-
-    // ----------------------------------------------------------
-    // AXI control logic
-    // ----------------------------------------------------------
-    assign arid_o     = 4'd0;
-    assign arsize_o   = 3'b010; // 4 bytes
-    assign arburst_o  = 2'b01;  // INCR
-    assign arlen_o    = 4'd1;   // two beats
-
-    assign awid_o     = 4'd0;
-    assign awsize_o   = 3'b010;
-    assign awburst_o  = 2'b01;
-    assign awlen_o    = 4'd1;   // two beats
-
-    assign wid_o      = 4'd0;
-    assign wstrb_o    = 4'hF;
-
-    assign arvalid_o  = (state==S_AR);
-    assign araddr_o   = (ar_cnt==0) ? src_addr0 : src_addr1;
-
-    assign rready_o   = (state==S_R);
-
-    assign awvalid_o  = (state==S_AW);
-    assign awaddr_o   = (aw_cnt==0) ? dst_addr0 : dst_addr1;
-
-    assign wvalid_o   = (state==S_W);
-    assign wdata_o    = (wr_cnt==0) ? buffer[0][0] :
-                        (wr_cnt==1) ? buffer[0][1] :
-                        (wr_cnt==2) ? buffer[1][0] :
-                                       buffer[1][1];
-    assign wlast_o    = (wr_cnt==1) || (wr_cnt==3);
-
-    assign bready_o   = (state==S_B);
-
-    assign done_o     = done;
 
 endmodule
