@@ -193,32 +193,121 @@ module MPDMAC_ENGINE
         input [5:0] out_c;  // 0-based output col
         input [5:0] width;
         reg signed [6:0] src_r, src_c;  // 1-based source coordinates
-        reg signed [6:0] rel_r, rel_c;  // Relative to center
+        reg signed [6:7] rel_r, rel_c;  // Relative to center
+        reg [31:0] addr_offset;
+        reg [3:0] buf_idx;
         begin
-            // Convert output coordinates to source coordinates with mirror padding
-            // Output matrix: (0 to width+1) -> Source matrix: (1 to width)
+            // First, check if this output position requires reading from mirrored region
+            // For positions that need mirroring, we directly calculate the buffer index
+            
+            // Top row (out_r == 0): mirror from row 1 (0-based) of source
             if (out_r == 0) begin
-                src_r = 2;  // Top padding: mirror from row 2 (1-based)
-            end else if (out_r == width + 1) begin
-                src_r = width - 1;  // Bottom padding: mirror from second-to-last row
-            end else begin
-                src_r = out_r;  // Normal region: out_r maps to row out_r (1-based)
+                // Reading from mirrored top region
+                if (out_c == 0) begin
+                    // Top-left corner: (1,1) in source (0-based)
+                    buf_idx = 4;  // Center of 3x3 buffer when center is at (1,1)
+                end else if (out_c == width + 1) begin
+                    // Top-right corner: (1,width-2) in source (0-based)
+                    // Need to calculate based on current center position
+                    src_r = 2;  // 1-based
+                    src_c = width - 1;  // 1-based
+                    rel_r = src_r - center_row;
+                    rel_c = src_c - center_col;
+                    if (rel_r >= -1 && rel_r <= 1 && rel_c >= -1 && rel_c <= 1) begin
+                        buf_idx = (rel_r + 1) * 3 + (rel_c + 1);
+                    end else begin
+                        buf_idx = 4;  // Fallback to center
+                    end
+                end else begin
+                    // Top edge: mirror from row 1
+                    src_r = 2;  // 1-based (row index 1 in 0-based)
+                    src_c = out_c;  // 1-based
+                    rel_r = src_r - center_row;
+                    rel_c = src_c - center_col;
+                    if (rel_r >= -1 && rel_r <= 1 && rel_c >= -1 && rel_c <= 1) begin
+                        buf_idx = (rel_r + 1) * 3 + (rel_c + 1);
+                    end else begin
+                        buf_idx = 4;  // Fallback to center
+                    end
+                end
+            end
+            // Bottom row (out_r == width + 1): mirror from row width-2 (0-based) of source
+            else if (out_r == width + 1) begin
+                // Reading from mirrored bottom region
+                if (out_c == 0) begin
+                    // Bottom-left corner
+                    src_r = width - 1;  // 1-based
+                    src_c = 2;  // 1-based
+                    rel_r = src_r - center_row;
+                    rel_c = src_c - center_col;
+                    if (rel_r >= -1 && rel_r <= 1 && rel_c >= -1 && rel_c <= 1) begin
+                        buf_idx = (rel_r + 1) * 3 + (rel_c + 1);
+                    end else begin
+                        buf_idx = 4;  // Fallback to center
+                    end
+                end else if (out_c == width + 1) begin
+                    // Bottom-right corner
+                    src_r = width - 1;  // 1-based
+                    src_c = width - 1;  // 1-based
+                    rel_r = src_r - center_row;
+                    rel_c = src_c - center_col;
+                    if (rel_r >= -1 && rel_r <= 1 && rel_c >= -1 && rel_c <= 1) begin
+                        buf_idx = (rel_r + 1) * 3 + (rel_c + 1);
+                    end else begin
+                        buf_idx = 4;  // Fallback to center
+                    end
+                end else begin
+                    // Bottom edge
+                    src_r = width - 1;  // 1-based
+                    src_c = out_c;  // 1-based
+                    rel_r = src_r - center_row;
+                    rel_c = src_c - center_col;
+                    if (rel_r >= -1 && rel_r <= 1 && rel_c >= -1 && rel_c <= 1) begin
+                        buf_idx = (rel_r + 1) * 3 + (rel_c + 1);
+                    end else begin
+                        buf_idx = 4;  // Fallback to center
+                    end
+                end
+            end
+            // Left column (out_c == 0): mirror from col 1 (0-based) of source
+            else if (out_c == 0) begin
+                src_r = out_r;  // 1-based
+                src_c = 2;  // 1-based (col index 1 in 0-based)
+                rel_r = src_r - center_row;
+                rel_c = src_c - center_col;
+                if (rel_r >= -1 && rel_r <= 1 && rel_c >= -1 && rel_c <= 1) begin
+                    buf_idx = (rel_r + 1) * 3 + (rel_c + 1);
+                end else begin
+                    buf_idx = 4;  // Fallback to center
+                end
+            end
+            // Right column (out_c == width + 1): mirror from col width-2 (0-based) of source
+            else if (out_c == width + 1) begin
+                src_r = out_r;  // 1-based
+                src_c = width - 1;  // 1-based (col index width-2 in 0-based)
+                rel_r = src_r - center_row;
+                rel_c = src_c - center_col;
+                if (rel_r >= -1 && rel_r <= 1 && rel_c >= -1 && rel_c <= 1) begin
+                    buf_idx = (rel_r + 1) * 3 + (rel_c + 1);
+                end else begin
+                    buf_idx = 4;  // Fallback to center
+                end
+            end
+            // Normal region: direct mapping
+            else begin
+                src_r = out_r;  // 1-based
+                src_c = out_c;  // 1-based
+                rel_r = src_r - center_row;
+                rel_c = src_c - center_col;
+                if (rel_r >= -1 && rel_r <= 1 && rel_c >= -1 && rel_c <= 1) begin
+                    buf_idx = (rel_r + 1) * 3 + (rel_c + 1);
+                end else begin
+                    buf_idx = 4;  // Fallback to center
+                end
             end
             
-            if (out_c == 0) begin
-                src_c = 2;  // Left padding: mirror from col 2 (1-based)
-            end else if (out_c == width + 1) begin
-                src_c = width - 1;  // Right padding: mirror from second-to-last col
-            end else begin
-                src_c = out_c;  // Normal region: out_c maps to col out_c (1-based)
-            end
-            
-            // Calculate relative position to current center
-            rel_r = src_r - center_row;
-            rel_c = src_c - center_col;
-            
-            // Get value from buffer
-            calc_output_value = get_buffer_value(rel_r, rel_c);
+            // Return value from buffer
+            calc_output_value = buffer_3x3[buf_idx];
         end
     endfunction
     
@@ -430,18 +519,22 @@ module MPDMAC_ENGINE
                 
                 S_NEXT_BLOCK: begin
                     // Move to next 2x2 block
-                    if (block_col + 2 < mat_width + 2) begin
+                    if (block_col + 2 <= mat_width + 1) begin  // Changed < to <= to include last column
                         block_col <= block_col + 2;
                         center_col <= center_col + 2;
                     end else begin
                         block_col <= 6'd0;
                         center_col <= 7'd1;
-                        block_row <= block_row + 2;
-                        center_row <= center_row + 2;
+                        
+                        // Only increment row if we haven't finished all rows
+                        if (block_row + 2 <= mat_width + 1) begin  // Added condition to prevent overflow
+                            block_row <= block_row + 2;
+                            center_row <= center_row + 2;
+                        end
                     end
                     
-                    // Check if done - fixed completion condition
-                    if (block_row >= mat_width + 2) begin
+                    // Check if done - check both row and column completion
+                    if (block_row + 2 > mat_width + 1) begin  // Changed condition to properly detect completion
                         state <= S_DONE;
                     end else begin
                         state <= S_READ_3x3;
