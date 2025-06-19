@@ -57,7 +57,7 @@ module MPDMAC_ENGINE
 );
     // Design here
 
-     // ----------------------------------------------------------
+    // ----------------------------------------------------------
     // Parameters and internal signals
     // ----------------------------------------------------------
 
@@ -161,7 +161,6 @@ module MPDMAC_ENGINE
     wire [5:0] src_r0 = mirror_idx(row    , pad_width, mat_width);
     wire [5:0] src_r1 = mirror_idx(row+1 , pad_width, mat_width);
     wire [5:0] src_c0 = mirror_idx(col    , pad_width, mat_width);
-    wire [5:0] src_c1 = mirror_idx(col+1 , pad_width, mat_width);
 
     wire [31:0] src_addr0 = src_base + (((src_r0 * mat_width) + src_c0) << 2);
     wire [31:0] src_addr1 = src_base + (((src_r1 * mat_width) + src_c0) << 2);
@@ -211,8 +210,8 @@ module MPDMAC_ENGINE
 
             S_R: begin
                 if (rvalid_i) begin
-                    if (rd_cnt == 3) begin
-                        rd_cnt_n = 0;
+                    if (rlast_i) begin
+                        rd_cnt_n = 3'd0;
                         state_n  = S_AW;
                     end else begin
                         rd_cnt_n = rd_cnt + 1;
@@ -233,8 +232,8 @@ module MPDMAC_ENGINE
 
             S_W: begin
                 if (wready_i) begin
-                    if (wr_cnt == 3) begin
-                        wr_cnt_n = 0;
+                    if (wlast_o) begin
+                        wr_cnt_n = 3'd0;
                         state_n  = S_B;
                     end else begin
                         wr_cnt_n = wr_cnt + 1;
@@ -300,6 +299,5 @@ module MPDMAC_ENGINE
     assign bready_o   = (state==S_B);
 
     assign done_o     = done;
-
 
 endmodule
