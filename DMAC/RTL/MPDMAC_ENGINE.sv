@@ -413,25 +413,22 @@ module MPDMAC_ENGINE
             end
             
             S_PROCESS: begin
-                // Apply padding based on block type
-                // (padding logic will be implemented using non-blocking assignments)
-                
+                // Apply padding based on block type - 한 번만 실행
                 write_cnt_n = 5'd0;
                 write_len_n = get_output_len(block_type);
+                state_n = S_WREQ;
                 
                 $display("[DEBUG] Processing block type %d, output_len=%d", block_type, get_output_len(block_type));
-                
-                state_n = S_WREQ;
             end
             
             S_WREQ: begin
                 awvalid = 1'b1;
                 if (aw_handshake) begin
                     state_n = S_WDATA;
-                    burst_cnt_n = write_len - 1;  // SGDMAC 패턴: burst length 설정
+                    burst_cnt_n = awlen_o;  // RTL_new 패턴: awlen_o 값으로 초기화
                     
                     $display("[DEBUG] Write REQ: block(%d,%d), len=%d, addr=%h", 
-                            block_x, block_y, write_len-1, awaddr_o);
+                            block_x, block_y, awlen_o, awaddr_o);
                 end
             end
             
@@ -443,26 +440,27 @@ module MPDMAC_ENGINE
                     
                     $display("[DEBUG] Write DATA[%d] = %d", write_cnt, wdata_o);
                     
-                    if (burst_done) begin
-                        // SGDMAC 패턴: burst 완료, response 확인
-                        state_n = b_handshake ? 
-                                  (all_blocks_done ? S_IDLE : S_RREQ) : S_WRESP;
-                        
-                        if (b_handshake && !all_blocks_done) begin
-                            // Move to next block
-                            block_x_n = next_block_x;
-                            block_y_n = next_block_y;
-                            
-                            read_row_n = 2'd0;
-                            block_type_n = detect_block_type(block_x_n, block_y_n, blocks_per_row, blocks_per_col);
-                            
-                            $display("[DEBUG] Block (%d,%d) completed, moving to (%d,%d)", 
-                                    block_x, block_y, block_x_n, block_y_n);
-                        end
-                        
-                        if (b_handshake && all_blocks_done) begin
-                            done_n = 1'b1;
-                            $display("[DEBUG] All blocks completed!");
+                    if (is_last_beat) begin
+                        // RTL_new 패턴: wlast와 동시에 response 처리
+                        if (b_handshake) begin
+                            // Same cycle: write complete + response received
+                            if (all_blocks_done) begin
+                                state_n = S_IDLE;
+                                done_n = 1'b1;
+                                $display("[DEBUG] All blocks completed!");
+                            end else begin
+                                // Move to next block immediately
+                                block_x_n = next_block_x;
+                                block_y_n = next_block_y;
+                                read_row_n = 2'd0;
+                                block_type_n = detect_block_type(next_block_x, next_block_y, blocks_per_row, blocks_per_col);
+                                state_n = S_RREQ;
+                                $display("[DEBUG] Block (%d,%d) completed, moving to (%d,%d)", 
+                                        block_x, block_y, next_block_x, next_block_y);
+                            end
+                        end else begin
+                            // Wait for response in next state
+                            state_n = S_WRESP;
                         end
                     end
                 end
@@ -566,7 +564,7 @@ module MPDMAC_ENGINE
 
     assign awid_o = 4'd0;
     assign awaddr_o = calc_write_addr(block_x, block_y, mat_width, dst_addr, block_type);
-    assign awlen_o = write_len - 1;   // burst length
+    assign awlen_o = write_len - 1;   // burst length (0-based)
     assign awsize_o = 3'b010;         // 4 bytes per transfer
     assign awburst_o = 2'b01;         // incremental
     assign awvalid_o = awvalid;
@@ -577,7 +575,7 @@ module MPDMAC_ENGINE
     assign wlast_o = (state == S_WDATA) & is_last_beat;  // SGDMAC 패턴
     assign wvalid_o = wvalid;
 
-    assign bready_o = (state == S_WDATA) | (state == S_WRESP);  // SGDMAC 패턴
+    assign bready_o = (state == S_WDATA) & is_last_beat | (state == S_WRESP);  // RTL_new 패턴
 
     assign arid_o = 4'd0;
     assign araddr_o = calc_read_addr(block_x, block_y, read_row, mat_width, src_addr);
