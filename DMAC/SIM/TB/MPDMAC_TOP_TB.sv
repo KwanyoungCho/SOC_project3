@@ -294,40 +294,40 @@ module DMAC_TOP_TB ();
         // src_addr        = 'h0000_0100;
         // dst_addr        = 'h0000_A000;
         // mat_width       = 16;
-        // $display("===================================================");
-        // $display(" TestCase 2 | MAT_WIDTH = 16"); 
-        // $display("===================================================");
-        // gen_matrix(src_addr, mat_width);
-        // gen_mpmatrix(mat_width);
-        // start_dma(src_addr, dst_addr, mat_width, time_1);
-        // tescase_pass = 1;
-        // check_result(dst_addr, mat_width, tescase_pass);
-        // if(tescase_pass == 1) begin
-        //     $display("TestCase 2 Pass!");
-        // end else begin
-        //     $display("TestCase 2 Fail!");
-        //     testcase2_pass = 0;
-        // end
-        // $display("");
-
-        src_addr        = 'h0000_0000;
-        dst_addr        = 'h0000_0A00;
-        mat_width       = 8;
         $display("===================================================");
-        $display(" TestCase 3 | MAT_WIDTH = 8"); 
+        $display(" TestCase 2 | MAT_WIDTH = 16"); 
         $display("===================================================");
         gen_matrix(src_addr, mat_width);
         gen_mpmatrix(mat_width);
-        start_dma(src_addr, dst_addr, mat_width, time_2);
+        start_dma(src_addr, dst_addr, mat_width, time_1);
         tescase_pass = 1;
         check_result(dst_addr, mat_width, tescase_pass);
         if(tescase_pass == 1) begin
-            $display("TestCase 3 Pass!");
+            $display("TestCase 2 Pass!");
         end else begin
-            $display("TestCase 3 Fail!");
-            testcase3_pass = 0;
+            $display("TestCase 2 Fail!");
+            testcase2_pass = 0;
         end
         $display("");
+
+        // src_addr        = 'h0000_0000;
+        // dst_addr        = 'h0000_0A00;
+        // mat_width       = 8;
+        // $display("===================================================");
+        // $display(" TestCase 3 | MAT_WIDTH = 8"); 
+        // $display("===================================================");
+        // gen_matrix(src_addr, mat_width);
+        // gen_mpmatrix(mat_width);
+        // start_dma(src_addr, dst_addr, mat_width, time_2);
+        // tescase_pass = 1;
+        // check_result(dst_addr, mat_width, tescase_pass);
+        // if(tescase_pass == 1) begin
+        //     $display("TestCase 3 Pass!");
+        // end else begin
+        //     $display("TestCase 3 Fail!");
+        //     testcase3_pass = 0;
+        // end
+        // $display("");
 
         // $display("");
         // $display("===================================================");
