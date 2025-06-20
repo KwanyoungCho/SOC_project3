@@ -328,7 +328,8 @@ module MPDMAC_ENGINE
             // 현재 행의 cnt번째 데이터 반환
             buf_y = row;
             buf_x = cnt;
-            get_output_data = buffer[cnt][row];
+            get_output_data = buffer[buf_x][buf_y];
+            $display("[DEBUG] get_output_data: cnt=%d, row=%d, data=%d", cnt, row, get_output_data);
         end
     endfunction
     
