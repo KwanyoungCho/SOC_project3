@@ -21,7 +21,7 @@ module MPDMAC_TOP
     // AMBA AXI interface (AW channel)
     output  wire    [3:0]       awid_o,
     output  wire    [31:0]      awaddr_o,
-    output  wire    [4:0]       awlen_o,
+    output  wire    [3:0]       awlen_o,
     output  wire    [2:0]       awsize_o,
     output  wire    [1:0]       awburst_o,
     output  wire                awvalid_o,
