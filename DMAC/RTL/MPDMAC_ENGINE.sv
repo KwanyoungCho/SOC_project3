@@ -56,15 +56,16 @@ module MPDMAC_ENGINE
     output  wire                        rready_o
 );
 
-    // State Machine - DMAC_ENGINE 패턴 + 블록 처리
-    localparam S_IDLE   = 4'd0;
-    localparam S_RREQ   = 4'd1;
-    localparam S_RDATA  = 4'd2;
-    localparam S_PROCESS = 4'd3;  // padding 처리
-    localparam S_WREQ   = 4'd4;
-    localparam S_WDATA  = 4'd5;
+    // State definitions
+    localparam                  S_IDLE      = 3'd0,
+                                S_RREQ      = 3'd1,
+                                S_RDATA     = 3'd2,
+                                S_PROCESS   = 3'd3,
+                                S_WREQ      = 3'd4,
+                                S_WDATA     = 3'd5,
+                                S_WRESP     = 3'd6;  // SGDMAC 패턴: response 대기 상태 추가
 
-    reg [3:0]               state, state_n;
+    reg [2:0]                   state, state_n;
     
     // Configuration registers
     reg [31:0]              src_addr, src_addr_n;
@@ -84,9 +85,10 @@ module MPDMAC_ENGINE
     reg [1:0]               read_row, read_row_n;   // 4x4 블록 내 읽고 있는 행 (0~3)
     reg [1:0]               read_col, read_col_n;   // burst 내 읽고 있는 열 (0~3)
     
-    // Burst write variables
-    reg [4:0]               write_cnt, write_cnt_n; // 출력 중인 데이터 개수 (최대 25개)
-    reg [4:0]               write_len, write_len_n; // 현재 블록의 출력 길이
+    // Burst write variables - SGDMAC 패턴
+    reg [4:0]                   write_cnt, write_cnt_n; // 출력 중인 데이터 개수 (최대 25개)
+    reg [4:0]                   write_len, write_len_n; // 현재 블록의 출력 길이
+    reg [4:0]                   burst_cnt, burst_cnt_n; // SGDMAC 패턴: burst counter
     
     // Block type detection
     reg [3:0]               block_type, block_type_n;
@@ -119,11 +121,13 @@ module MPDMAC_ENGINE
     wire read_4x4_complete = (read_row == 2'd3) & read_burst_complete;
     
     // Write control - SGDMAC 패턴  
-    wire write_burst_complete = w_handshake & wlast_o;
+    wire is_last_beat = (burst_cnt == 5'd0);
+    wire burst_done = w_handshake & is_last_beat;
     wire write_data_available = 1'b1;  // 버퍼에서 항상 데이터 사용 가능
     
     // Helper signals  
-    wire all_blocks_done = (block_y >= blocks_per_col);
+    wire all_blocks_done = (block_y >= blocks_per_col) | 
+                          ((block_y == blocks_per_col - 1) & (block_x >= blocks_per_row - 1));
     
     // Block type detection function
     function [3:0] detect_block_type;
@@ -298,6 +302,7 @@ module MPDMAC_ENGINE
             read_col <= 2'd0;
             write_cnt <= 5'd0;
             write_len <= 5'd0;
+            burst_cnt <= 5'd0;
             block_type <= 4'd0;
             done <= 1'b1;
         end else begin
@@ -313,6 +318,7 @@ module MPDMAC_ENGINE
             read_col <= read_col_n;
             write_cnt <= write_cnt_n;
             write_len <= write_len_n;
+            burst_cnt <= burst_cnt_n;
             block_type <= block_type_n;
             done <= done_n;
         end
@@ -332,6 +338,7 @@ module MPDMAC_ENGINE
         read_col_n = read_col;
         write_cnt_n = write_cnt;
         write_len_n = write_len;
+        burst_cnt_n = burst_cnt;
         block_type_n = block_type;
         done_n = done;
         
@@ -420,6 +427,7 @@ module MPDMAC_ENGINE
                 awvalid = 1'b1;
                 if (aw_handshake) begin
                     state_n = S_WDATA;
+                    burst_cnt_n = write_len - 1;  // SGDMAC 패턴: burst length 설정
                     
                     $display("[DEBUG] Write REQ: block(%d,%d), len=%d, addr=%h", 
                             block_x, block_y, write_len-1, awaddr_o);
@@ -430,37 +438,61 @@ module MPDMAC_ENGINE
                 wvalid = write_data_available;
                 if (w_handshake) begin
                     write_cnt_n = write_cnt + 1;
+                    burst_cnt_n = burst_cnt - 1;  // SGDMAC 패턴: burst counter 감소
                     
                     $display("[DEBUG] Write DATA[%d] = %d", write_cnt, wdata_o);
                     
-                    if (write_burst_complete) begin
-                        // SGDMAC 패턴: write burst 완료, response 확인
-                        if (b_handshake) begin
-                            // Both write complete and response received
-                            if (all_blocks_done) begin
-                                state_n = S_IDLE;
-                                done_n = 1'b1;
-                                $display("[DEBUG] All blocks completed!");
+                    if (burst_done) begin
+                        // SGDMAC 패턴: burst 완료, response 확인
+                        state_n = b_handshake ? 
+                                  (all_blocks_done ? S_IDLE : S_RREQ) : S_WRESP;
+                        
+                        if (b_handshake && !all_blocks_done) begin
+                            // Move to next block
+                            if (block_x == blocks_per_row - 1) begin
+                                block_x_n = 6'd0;
+                                block_y_n = block_y + 1;
                             end else begin
-                                // Move to next block
-                                if (block_x == blocks_per_row - 1) begin
-                                    block_x_n = 6'd0;
-                                    block_y_n = block_y + 1;
-                                end else begin
-                                    block_x_n = block_x + 1;
-                                end
-                                
-                                read_row_n = 2'd0;
-                                block_type_n = detect_block_type(block_x_n, block_y_n, blocks_per_row, blocks_per_col);
-                                
-                                state_n = S_RREQ;
-                                $display("[DEBUG] Block (%d,%d) completed, moving to (%d,%d)", 
-                                        block_x, block_y, block_x_n, block_y_n);
+                                block_x_n = block_x + 1;
                             end
-                        end else begin
-                            // Wait for response - stay in WDATA but don't assert wvalid
-                            wvalid = 1'b0;
+                            
+                            read_row_n = 2'd0;
+                            block_type_n = detect_block_type(block_x_n, block_y_n, blocks_per_row, blocks_per_col);
+                            
+                            $display("[DEBUG] Block (%d,%d) completed, moving to (%d,%d)", 
+                                    block_x, block_y, block_x_n, block_y_n);
                         end
+                        
+                        if (b_handshake && all_blocks_done) begin
+                            done_n = 1'b1;
+                            $display("[DEBUG] All blocks completed!");
+                        end
+                    end
+                end
+            end
+            
+            S_WRESP: begin
+                // SGDMAC 패턴: response 대기 상태
+                if (b_handshake) begin
+                    state_n = all_blocks_done ? S_IDLE : S_RREQ;
+                    
+                    if (!all_blocks_done) begin
+                        // Move to next block
+                        if (block_x == blocks_per_row - 1) begin
+                            block_x_n = 6'd0;
+                            block_y_n = block_y + 1;
+                        end else begin
+                            block_x_n = block_x + 1;
+                        end
+                        
+                        read_row_n = 2'd0;
+                        block_type_n = detect_block_type(block_x_n, block_y_n, blocks_per_row, blocks_per_col);
+                        
+                        $display("[DEBUG] Block (%d,%d) completed, moving to (%d,%d)", 
+                                block_x, block_y, block_x_n, block_y_n);
+                    end else begin
+                        done_n = 1'b1;
+                        $display("[DEBUG] All blocks completed!");
                     end
                 end
             end
@@ -546,10 +578,10 @@ module MPDMAC_ENGINE
     assign wid_o = 4'd0;
     assign wdata_o = get_output_data(write_cnt, block_type);
     assign wstrb_o = 4'b1111;         // all bytes valid
-    assign wlast_o = (write_cnt == write_len - 1);
+    assign wlast_o = (state == S_WDATA) & is_last_beat;  // SGDMAC 패턴
     assign wvalid_o = wvalid;
 
-    assign bready_o = (state == S_WDATA);  // SGDMAC 패턴: write 중에만 ready
+    assign bready_o = (state == S_WDATA) | (state == S_WRESP);  // SGDMAC 패턴
 
     assign arid_o = 4'd0;
     assign araddr_o = calc_read_addr(block_x, block_y, read_row, mat_width, src_addr);
