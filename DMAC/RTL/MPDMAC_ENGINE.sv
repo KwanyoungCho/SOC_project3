@@ -365,8 +365,6 @@ module MPDMAC_ENGINE
             S_RDATA: begin
                 rready = 1'b1;
                 if (rvalid_i) begin
-                    // Store data in buffer at correct position
-                    buffer[get_base_x(block_type) + read_col][get_base_y(block_type) + read_row] = rdata_i;
                     read_col_n = read_col + 1;
                     
                     $display("[DEBUG] Read DATA[%d,%d] = %d -> buffer[%d][%d]", 
@@ -435,52 +433,62 @@ module MPDMAC_ENGINE
         endcase
     end
     
-    // Apply padding in S_PROCESS state
+    // Buffer management in always_ff block
     integer i, j;
     always_ff @(posedge clk) begin
-        if (state == S_PROCESS) begin
-            case (block_type)
-                TYPE_TL: begin
-                    // TL: (1,1) 기준으로 4x4 저장됨, padding 적용
-                    buffer[0][0] <= buffer[2][2];  // corner
-                    for (i = 0; i < 5; i = i + 1) buffer[i][0] <= buffer[i][2];  // top row
-                    for (j = 0; j < 5; j = j + 1) buffer[0][j] <= buffer[2][j];  // left col
-                end
-                TYPE_TR: begin
-                    // TR: (0,1) 기준으로 4x4 저장됨
-                    for (i = 0; i < 5; i = i + 1) buffer[i][0] <= buffer[i][2];  // top row
-                    for (j = 0; j < 5; j = j + 1) buffer[4][j] <= buffer[2][j];  // right col
-                end
-                TYPE_BL: begin
-                    // BL: (1,0) 기준으로 4x4 저장됨
-                    for (i = 0; i < 5; i = i + 1) buffer[i][4] <= buffer[i][2];  // bottom row
-                    for (j = 0; j < 5; j = j + 1) buffer[0][j] <= buffer[2][j];  // left col
-                end
-                TYPE_BR: begin
-                    // BR: (0,0) 기준으로 4x4 저장됨
-                    for (i = 0; i < 5; i = i + 1) buffer[i][4] <= buffer[i][2];  // bottom row
-                    for (j = 0; j < 5; j = j + 1) buffer[4][j] <= buffer[2][j];  // right col
-                end
-                TYPE_T: begin
-                    // T: (0,1) 기준으로 4x4 저장됨, top padding만
-                    for (i = 0; i < 5; i = i + 1) buffer[i][0] <= buffer[i][2];  // top row
-                end
-                TYPE_B: begin
-                    // B: (0,0) 기준으로 4x4 저장됨, bottom padding만
-                    for (i = 0; i < 5; i = i + 1) buffer[i][4] <= buffer[i][2];  // bottom row
-                end
-                TYPE_L: begin
-                    // L: (1,0) 기준으로 4x4 저장됨, left padding만
-                    for (j = 0; j < 5; j = j + 1) buffer[0][j] <= buffer[2][j];  // left col
-                end
-                TYPE_R: begin
-                    // R: (0,0) 기준으로 4x4 저장됨, right padding만
-                    for (j = 0; j < 5; j = j + 1) buffer[4][j] <= buffer[2][j];  // right col
-                end
-                TYPE_INNER: begin
-                    // INNER: (1,1) 기준으로 4x4 저장됨, padding 없음
-                end
-            endcase
+        if (!rst_n) begin
+            // Reset buffer (optional)
+        end else begin
+            // Store read data in buffer
+            if (state == S_RDATA && rvalid_i) begin
+                buffer[get_base_x(block_type) + read_col][get_base_y(block_type) + read_row] <= rdata_i;
+            end
+            
+            // Apply padding in S_PROCESS state
+            if (state == S_PROCESS) begin
+                case (block_type)
+                    TYPE_TL: begin
+                        // TL: (1,1) 기준으로 4x4 저장됨, padding 적용
+                        buffer[0][0] <= buffer[2][2];  // corner
+                        for (i = 0; i < 5; i = i + 1) buffer[i][0] <= buffer[i][2];  // top row
+                        for (j = 0; j < 5; j = j + 1) buffer[0][j] <= buffer[2][j];  // left col
+                    end
+                    TYPE_TR: begin
+                        // TR: (0,1) 기준으로 4x4 저장됨
+                        for (i = 0; i < 5; i = i + 1) buffer[i][0] <= buffer[i][2];  // top row
+                        for (j = 0; j < 5; j = j + 1) buffer[4][j] <= buffer[2][j];  // right col
+                    end
+                    TYPE_BL: begin
+                        // BL: (1,0) 기준으로 4x4 저장됨
+                        for (i = 0; i < 5; i = i + 1) buffer[i][4] <= buffer[i][2];  // bottom row
+                        for (j = 0; j < 5; j = j + 1) buffer[0][j] <= buffer[2][j];  // left col
+                    end
+                    TYPE_BR: begin
+                        // BR: (0,0) 기준으로 4x4 저장됨
+                        for (i = 0; i < 5; i = i + 1) buffer[i][4] <= buffer[i][2];  // bottom row
+                        for (j = 0; j < 5; j = j + 1) buffer[4][j] <= buffer[2][j];  // right col
+                    end
+                    TYPE_T: begin
+                        // T: (0,1) 기준으로 4x4 저장됨, top padding만
+                        for (i = 0; i < 5; i = i + 1) buffer[i][0] <= buffer[i][2];  // top row
+                    end
+                    TYPE_B: begin
+                        // B: (0,0) 기준으로 4x4 저장됨, bottom padding만
+                        for (i = 0; i < 5; i = i + 1) buffer[i][4] <= buffer[i][2];  // bottom row
+                    end
+                    TYPE_L: begin
+                        // L: (1,0) 기준으로 4x4 저장됨, left padding만
+                        for (j = 0; j < 5; j = j + 1) buffer[0][j] <= buffer[2][j];  // left col
+                    end
+                    TYPE_R: begin
+                        // R: (0,0) 기준으로 4x4 저장됨, right padding만
+                        for (j = 0; j < 5; j = j + 1) buffer[4][j] <= buffer[2][j];  // right col
+                    end
+                    TYPE_INNER: begin
+                        // INNER: (1,1) 기준으로 4x4 저장됨, padding 없음
+                    end
+                endcase
+            end
         end
     end
 
