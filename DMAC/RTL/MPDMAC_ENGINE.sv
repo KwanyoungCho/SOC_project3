@@ -210,32 +210,31 @@ module MPDMAC_ENGINE
             // - 출력 row width -> 소스 row width
             // - 출력 row (width+1) -> 소스 row (width-1) (원본의 마지막에서 두 번째 행을 미러링)
             
+            // 올바른 미러 패딩 매핑
+            // out(0,0) -> src(1,1), out(0,1) -> src(1,0) 등
+            
             // 행 변환
             if (out_r == 0) begin
-                // 상단 패딩: 출력 0행 -> 소스 2행 (1-based)
-                src_r = 2;
+                // 상단 패딩: 출력 0행 -> 소스 1행 (1-based)
+                src_r = 1;
             end else if (out_r == width + 1) begin
-                // 하단 패딩: 출력 (width+1)행 -> 소스 (width-1)행 (1-based)
-                src_r = width - 1;
-            end else if (out_r >= 1 && out_r <= width) begin
-                // 일반 영역: 출력 행이 그대로 소스 행이 됨 (1-based)
-                src_r = out_r;
+                // 하단 패딩: 출력 (width+1)행 -> 소스 width행 (1-based)
+                src_r = width;
             end else begin
-                src_r = out_r; // 예외 처리
+                // 일반 영역: 출력 행을 그대로 소스 행으로 매핑 (1-based)
+                src_r = out_r;
             end
             
             // 열 변환
             if (out_c == 0) begin
-                // 좌측 패딩: 출력 0열 -> 소스 2열 (1-based)
-                src_c = 2;
+                // 좌측 패딩: 출력 0열 -> 소스 1열 (1-based)
+                src_c = 1;
             end else if (out_c == width + 1) begin
-                // 우측 패딩: 출력 (width+1)열 -> 소스 (width-1)열 (1-based)
-                src_c = width - 1;
-            end else if (out_c >= 1 && out_c <= width) begin
-                // 일반 영역: 출력 열이 그대로 소스 열이 됨 (1-based)
-                src_c = out_c;
+                // 우측 패딩: 출력 (width+1)열 -> 소스 width열 (1-based)
+                src_c = width;
             end else begin
-                src_c = out_c; // 예외 처리
+                // 일반 영역: 출력 열을 그대로 소스 열로 매핑 (1-based)
+                src_c = out_c;
             end
             
             // 현재 중심에 대한 상대 위치 계산

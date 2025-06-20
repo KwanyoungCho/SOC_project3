@@ -1,19 +1,19 @@
 [DEBUG] Starting DMA: src=00000000, dst=00000a00, width= 8
 [DEBUG] get_mirrored_addr: src(          0,          0) -> mirrored(          1,          1) offset=00000000
 [DEBUG] Read REQ: block( 0, 0) center(          1,          1) reading row          0 from pos(          0,          0) addr=00000000
-[DEBUG] Read DATA: buffer[ 0] =        633 (0x00000279)
-[DEBUG] Read DATA: buffer[ 1] =        205 (0x000000cd)
-[DEBUG] Read DATA: buffer[ 2] =       3218 (0x00000c92)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =        633 (0x00000279)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =        205 (0x000000cd)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =       3218 (0x00000c92)
 [DEBUG] get_mirrored_addr: src(          1,          0) -> mirrored(          1,          1) offset=00000000
 [DEBUG] Read REQ: block( 0, 0) center(          1,          1) reading row          1 from pos(          1,          0) addr=00000000
-[DEBUG] Read DATA: buffer[ 3] =        633 (0x00000279)
-[DEBUG] Read DATA: buffer[ 4] =        205 (0x000000cd)
-[DEBUG] Read DATA: buffer[ 5] =       3218 (0x00000c92)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =        633 (0x00000279)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =        205 (0x000000cd)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =       3218 (0x00000c92)
 [DEBUG] get_mirrored_addr: src(          2,          0) -> mirrored(          2,          1) offset=00000020
 [DEBUG] Read REQ: block( 0, 0) center(          1,          1) reading row          2 from pos(          2,          0) addr=00000020
-[DEBUG] Read DATA: buffer[ 6] =        587 (0x0000024b)
-[DEBUG] Read DATA: buffer[ 7] =        443 (0x000001bb)
-[DEBUG] Read DATA: buffer[ 8] =       2433 (0x00000981)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =        587 (0x0000024b)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =        443 (0x000001bb)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =       2433 (0x00000981)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] First block calc: out( 0, 0) -> src(          2,          2) -> rel(          1,          1) vs center(          1,          1)
 [DEBUG] First block buffer: index=          8, value=      2433
@@ -55,17 +55,17 @@
 [DEBUG] Starting next block read
 [DEBUG] get_mirrored_addr: src(          0,          2) -> mirrored(          1,          2) offset=00000004
 [DEBUG] Read REQ: block( 0, 2) center(          1,          3) reading row          0 from pos(          0,          2) addr=00000004
-[DEBUG] Read DATA: buffer[ 0] =        205 (0x000000cd)
-[DEBUG] Read DATA: buffer[ 1] =       3218 (0x00000c92)
-[DEBUG] Read DATA: buffer[ 2] =         69 (0x00000045)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =        205 (0x000000cd)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =       3218 (0x00000c92)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =         69 (0x00000045)
 [DEBUG] Read REQ: block( 0, 2) center(          1,          3) reading row          1 from pos(          1,          2) addr=00000004
-[DEBUG] Read DATA: buffer[ 3] =        205 (0x000000cd)
-[DEBUG] Read DATA: buffer[ 4] =       3218 (0x00000c92)
-[DEBUG] Read DATA: buffer[ 5] =         69 (0x00000045)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =        205 (0x000000cd)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =       3218 (0x00000c92)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =         69 (0x00000045)
 [DEBUG] Read REQ: block( 0, 2) center(          1,          3) reading row          2 from pos(          2,          2) addr=00000024
-[DEBUG] Read DATA: buffer[ 6] =        443 (0x000001bb)
-[DEBUG] Read DATA: buffer[ 7] =       2433 (0x00000981)
-[DEBUG] Read DATA: buffer[ 8] =       2226 (0x000008b2)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =        443 (0x000001bb)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =       2433 (0x00000981)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =       2226 (0x000008b2)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] PREPARE: block( 0, 2) center(          1,          3)
 [DEBUG] Output positions: TL( 0, 2) TR( 0,         3) BL(         1, 2) BR(         1,         3)
@@ -86,17 +86,17 @@
 [DEBUG] Starting next block read
 [DEBUG] get_mirrored_addr: src(          0,          4) -> mirrored(          1,          4) offset=0000000c
 [DEBUG] Read REQ: block( 0, 4) center(          1,          5) reading row          0 from pos(          0,          4) addr=0000000c
-[DEBUG] Read DATA: buffer[ 0] =         69 (0x00000045)
-[DEBUG] Read DATA: buffer[ 1] =       2729 (0x00000aa9)
-[DEBUG] Read DATA: buffer[ 2] =       3230 (0x00000c9e)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =         69 (0x00000045)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =       2729 (0x00000aa9)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =       3230 (0x00000c9e)
 [DEBUG] Read REQ: block( 0, 4) center(          1,          5) reading row          1 from pos(          1,          4) addr=0000000c
-[DEBUG] Read DATA: buffer[ 3] =         69 (0x00000045)
-[DEBUG] Read DATA: buffer[ 4] =       2729 (0x00000aa9)
-[DEBUG] Read DATA: buffer[ 5] =       3230 (0x00000c9e)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =         69 (0x00000045)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =       2729 (0x00000aa9)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =       3230 (0x00000c9e)
 [DEBUG] Read REQ: block( 0, 4) center(          1,          5) reading row          2 from pos(          2,          4) addr=0000002c
-[DEBUG] Read DATA: buffer[ 6] =       2226 (0x000008b2)
-[DEBUG] Read DATA: buffer[ 7] =       1971 (0x000007b3)
-[DEBUG] Read DATA: buffer[ 8] =       2315 (0x0000090b)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =       2226 (0x000008b2)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =       1971 (0x000007b3)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =       2315 (0x0000090b)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] PREPARE: block( 0, 4) center(          1,          5)
 [DEBUG] Output positions: TL( 0, 4) TR( 0,         5) BL(         1, 4) BR(         1,         5)
@@ -117,17 +117,17 @@
 [DEBUG] Starting next block read
 [DEBUG] get_mirrored_addr: src(          0,          6) -> mirrored(          1,          6) offset=00000014
 [DEBUG] Read REQ: block( 0, 6) center(          1,          7) reading row          0 from pos(          0,          6) addr=00000014
-[DEBUG] Read DATA: buffer[ 0] =       3230 (0x00000c9e)
-[DEBUG] Read DATA: buffer[ 1] =       3037 (0x00000bdd)
-[DEBUG] Read DATA: buffer[ 2] =       3520 (0x00000dc0)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =       3230 (0x00000c9e)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =       3037 (0x00000bdd)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =       3520 (0x00000dc0)
 [DEBUG] Read REQ: block( 0, 6) center(          1,          7) reading row          1 from pos(          1,          6) addr=00000014
-[DEBUG] Read DATA: buffer[ 3] =       3230 (0x00000c9e)
-[DEBUG] Read DATA: buffer[ 4] =       3037 (0x00000bdd)
-[DEBUG] Read DATA: buffer[ 5] =       3520 (0x00000dc0)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =       3230 (0x00000c9e)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =       3037 (0x00000bdd)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =       3520 (0x00000dc0)
 [DEBUG] Read REQ: block( 0, 6) center(          1,          7) reading row          2 from pos(          2,          6) addr=00000034
-[DEBUG] Read DATA: buffer[ 6] =       2315 (0x0000090b)
-[DEBUG] Read DATA: buffer[ 7] =        328 (0x00000148)
-[DEBUG] Read DATA: buffer[ 8] =        225 (0x000000e1)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =       2315 (0x0000090b)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =        328 (0x00000148)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =        225 (0x000000e1)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] PREPARE: block( 0, 6) center(          1,          7)
 [DEBUG] Output positions: TL( 0, 6) TR( 0,         7) BL(         1, 6) BR(         1,         7)
@@ -148,17 +148,17 @@
 [DEBUG] Starting next block read
 [DEBUG] get_mirrored_addr: src(          0,          7) -> mirrored(          1,          7) offset=00000018
 [DEBUG] Read REQ: block( 0, 8) center(          1,          8) reading row          0 from pos(          0,          7) addr=00000018
-[DEBUG] Read DATA: buffer[ 0] =       3037 (0x00000bdd)
-[DEBUG] Read DATA: buffer[ 1] =       3520 (0x00000dc0)
-[DEBUG] Read DATA: buffer[ 2] =        587 (0x0000024b)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =       3037 (0x00000bdd)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =       3520 (0x00000dc0)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =        587 (0x0000024b)
 [DEBUG] Read REQ: block( 0, 8) center(          1,          8) reading row          1 from pos(          1,          7) addr=00000018
-[DEBUG] Read DATA: buffer[ 3] =       3037 (0x00000bdd)
-[DEBUG] Read DATA: buffer[ 4] =       3520 (0x00000dc0)
-[DEBUG] Read DATA: buffer[ 5] =        587 (0x0000024b)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =       3037 (0x00000bdd)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =       3520 (0x00000dc0)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =        587 (0x0000024b)
 [DEBUG] Read REQ: block( 0, 8) center(          1,          8) reading row          2 from pos(          2,          7) addr=00000038
-[DEBUG] Read DATA: buffer[ 6] =        328 (0x00000148)
-[DEBUG] Read DATA: buffer[ 7] =        225 (0x000000e1)
-[DEBUG] Read DATA: buffer[ 8] =       1532 (0x000005fc)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =        328 (0x00000148)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =        225 (0x000000e1)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =       1532 (0x000005fc)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] calc_output_value: out( 0, 8) -> src(          2,          8) -> rel(          1,          0) vs center(          1,          8)
 [DEBUG] Buffer access: index=          7, value=       225
@@ -187,19 +187,19 @@
 [DEBUG] Starting next block read
 [DEBUG] get_mirrored_addr: src(          2,          0) -> mirrored(          2,          1) offset=00000020
 [DEBUG] Read REQ: block( 2, 0) center(          3,          1) reading row          0 from pos(          2,          0) addr=00000020
-[DEBUG] Read DATA: buffer[ 0] =        587 (0x0000024b)
-[DEBUG] Read DATA: buffer[ 1] =        443 (0x000001bb)
-[DEBUG] Read DATA: buffer[ 2] =       2433 (0x00000981)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =        587 (0x0000024b)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =        443 (0x000001bb)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =       2433 (0x00000981)
 [DEBUG] get_mirrored_addr: src(          3,          0) -> mirrored(          3,          1) offset=00000040
 [DEBUG] Read REQ: block( 2, 0) center(          3,          1) reading row          1 from pos(          3,          0) addr=00000040
-[DEBUG] Read DATA: buffer[ 3] =       1532 (0x000005fc)
-[DEBUG] Read DATA: buffer[ 4] =       1199 (0x000004af)
-[DEBUG] Read DATA: buffer[ 5] =       3744 (0x00000ea0)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =       1532 (0x000005fc)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =       1199 (0x000004af)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =       3744 (0x00000ea0)
 [DEBUG] get_mirrored_addr: src(          4,          0) -> mirrored(          4,          1) offset=00000060
 [DEBUG] Read REQ: block( 2, 0) center(          3,          1) reading row          2 from pos(          4,          0) addr=00000060
-[DEBUG] Read DATA: buffer[ 6] =       2420 (0x00000974)
-[DEBUG] Read DATA: buffer[ 7] =        508 (0x000001fc)
-[DEBUG] Read DATA: buffer[ 8] =       3775 (0x00000ebf)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =       2420 (0x00000974)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =        508 (0x000001fc)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =       3775 (0x00000ebf)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] PREPARE: block( 2, 0) center(          3,          1)
 [DEBUG] Output positions: TL( 2, 0) TR( 2,         1) BL(         3, 0) BR(         3,         1)
@@ -219,17 +219,17 @@
 [DEBUG] Moving to next column: block( 2, 0)->( 2,         2) center(          3,          1)->(          3,         3)
 [DEBUG] Starting next block read
 [DEBUG] Read REQ: block( 2, 2) center(          3,          3) reading row          0 from pos(          2,          2) addr=00000024
-[DEBUG] Read DATA: buffer[ 0] =        443 (0x000001bb)
-[DEBUG] Read DATA: buffer[ 1] =       2433 (0x00000981)
-[DEBUG] Read DATA: buffer[ 2] =       2226 (0x000008b2)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =        443 (0x000001bb)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =       2433 (0x00000981)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =       2226 (0x000008b2)
 [DEBUG] Read REQ: block( 2, 2) center(          3,          3) reading row          1 from pos(          3,          2) addr=00000044
-[DEBUG] Read DATA: buffer[ 3] =       1199 (0x000004af)
-[DEBUG] Read DATA: buffer[ 4] =       3744 (0x00000ea0)
-[DEBUG] Read DATA: buffer[ 5] =       3854 (0x00000f0e)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =       1199 (0x000004af)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =       3744 (0x00000ea0)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =       3854 (0x00000f0e)
 [DEBUG] Read REQ: block( 2, 2) center(          3,          3) reading row          2 from pos(          4,          2) addr=00000064
-[DEBUG] Read DATA: buffer[ 6] =        508 (0x000001fc)
-[DEBUG] Read DATA: buffer[ 7] =       3775 (0x00000ebf)
-[DEBUG] Read DATA: buffer[ 8] =        607 (0x0000025f)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =        508 (0x000001fc)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =       3775 (0x00000ebf)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =        607 (0x0000025f)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] PREPARE: block( 2, 2) center(          3,          3)
 [DEBUG] Output positions: TL( 2, 2) TR( 2,         3) BL(         3, 2) BR(         3,         3)
@@ -249,17 +249,17 @@
 [DEBUG] Moving to next column: block( 2, 2)->( 2,         4) center(          3,          3)->(          3,         5)
 [DEBUG] Starting next block read
 [DEBUG] Read REQ: block( 2, 4) center(          3,          5) reading row          0 from pos(          2,          4) addr=0000002c
-[DEBUG] Read DATA: buffer[ 0] =       2226 (0x000008b2)
-[DEBUG] Read DATA: buffer[ 1] =       1971 (0x000007b3)
-[DEBUG] Read DATA: buffer[ 2] =       2315 (0x0000090b)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =       2226 (0x000008b2)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =       1971 (0x000007b3)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =       2315 (0x0000090b)
 [DEBUG] Read REQ: block( 2, 4) center(          3,          5) reading row          1 from pos(          3,          4) addr=0000004c
-[DEBUG] Read DATA: buffer[ 3] =       3854 (0x00000f0e)
-[DEBUG] Read DATA: buffer[ 4] =       1909 (0x00000775)
-[DEBUG] Read DATA: buffer[ 5] =       4057 (0x00000fd9)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =       3854 (0x00000f0e)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =       1909 (0x00000775)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =       4057 (0x00000fd9)
 [DEBUG] Read REQ: block( 2, 4) center(          3,          5) reading row          2 from pos(          4,          4) addr=0000006c
-[DEBUG] Read DATA: buffer[ 6] =        607 (0x0000025f)
-[DEBUG] Read DATA: buffer[ 7] =       2177 (0x00000881)
-[DEBUG] Read DATA: buffer[ 8] =       2664 (0x00000a68)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =        607 (0x0000025f)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =       2177 (0x00000881)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =       2664 (0x00000a68)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] PREPARE: block( 2, 4) center(          3,          5)
 [DEBUG] Output positions: TL( 2, 4) TR( 2,         5) BL(         3, 4) BR(         3,         5)
@@ -279,17 +279,17 @@
 [DEBUG] Moving to next column: block( 2, 4)->( 2,         6) center(          3,          5)->(          3,         7)
 [DEBUG] Starting next block read
 [DEBUG] Read REQ: block( 2, 6) center(          3,          7) reading row          0 from pos(          2,          6) addr=00000034
-[DEBUG] Read DATA: buffer[ 0] =       2315 (0x0000090b)
-[DEBUG] Read DATA: buffer[ 1] =        328 (0x00000148)
-[DEBUG] Read DATA: buffer[ 2] =        225 (0x000000e1)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =       2315 (0x0000090b)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =        328 (0x00000148)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =        225 (0x000000e1)
 [DEBUG] Read REQ: block( 2, 6) center(          3,          7) reading row          1 from pos(          3,          6) addr=00000054
-[DEBUG] Read DATA: buffer[ 3] =       4057 (0x00000fd9)
-[DEBUG] Read DATA: buffer[ 4] =       3597 (0x00000e0d)
-[DEBUG] Read DATA: buffer[ 5] =        295 (0x00000127)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =       4057 (0x00000fd9)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =       3597 (0x00000e0d)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =        295 (0x00000127)
 [DEBUG] Read REQ: block( 2, 6) center(          3,          7) reading row          2 from pos(          4,          6) addr=00000074
-[DEBUG] Read DATA: buffer[ 6] =       2664 (0x00000a68)
-[DEBUG] Read DATA: buffer[ 7] =       2298 (0x000008fa)
-[DEBUG] Read DATA: buffer[ 8] =        251 (0x000000fb)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =       2664 (0x00000a68)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =       2298 (0x000008fa)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =        251 (0x000000fb)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] PREPARE: block( 2, 6) center(          3,          7)
 [DEBUG] Output positions: TL( 2, 6) TR( 2,         7) BL(         3, 6) BR(         3,         7)
@@ -309,17 +309,17 @@
 [DEBUG] Moving to next column: block( 2, 6)->( 2,         8) center(          3,          7)->(          3,         8)
 [DEBUG] Starting next block read
 [DEBUG] Read REQ: block( 2, 8) center(          3,          8) reading row          0 from pos(          2,          7) addr=00000038
-[DEBUG] Read DATA: buffer[ 0] =        328 (0x00000148)
-[DEBUG] Read DATA: buffer[ 1] =        225 (0x000000e1)
-[DEBUG] Read DATA: buffer[ 2] =       1532 (0x000005fc)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =        328 (0x00000148)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =        225 (0x000000e1)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =       1532 (0x000005fc)
 [DEBUG] Read REQ: block( 2, 8) center(          3,          8) reading row          1 from pos(          3,          7) addr=00000058
-[DEBUG] Read DATA: buffer[ 3] =       3597 (0x00000e0d)
-[DEBUG] Read DATA: buffer[ 4] =        295 (0x00000127)
-[DEBUG] Read DATA: buffer[ 5] =       2420 (0x00000974)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =       3597 (0x00000e0d)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =        295 (0x00000127)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =       2420 (0x00000974)
 [DEBUG] Read REQ: block( 2, 8) center(          3,          8) reading row          2 from pos(          4,          7) addr=00000078
-[DEBUG] Read DATA: buffer[ 6] =       2298 (0x000008fa)
-[DEBUG] Read DATA: buffer[ 7] =        251 (0x000000fb)
-[DEBUG] Read DATA: buffer[ 8] =        281 (0x00000119)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =       2298 (0x000008fa)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =        251 (0x000000fb)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =        281 (0x00000119)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] calc_output_value: out( 2, 8) -> src(          2,          8) -> rel(         -1,          0) vs center(          3,          8)
 [DEBUG] Buffer access: index=          1, value=       225
@@ -348,19 +348,19 @@
 [DEBUG] Starting next block read
 [DEBUG] get_mirrored_addr: src(          4,          0) -> mirrored(          4,          1) offset=00000060
 [DEBUG] Read REQ: block( 4, 0) center(          5,          1) reading row          0 from pos(          4,          0) addr=00000060
-[DEBUG] Read DATA: buffer[ 0] =       2420 (0x00000974)
-[DEBUG] Read DATA: buffer[ 1] =        508 (0x000001fc)
-[DEBUG] Read DATA: buffer[ 2] =       3775 (0x00000ebf)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =       2420 (0x00000974)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =        508 (0x000001fc)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =       3775 (0x00000ebf)
 [DEBUG] get_mirrored_addr: src(          5,          0) -> mirrored(          5,          1) offset=00000080
 [DEBUG] Read REQ: block( 4, 0) center(          5,          1) reading row          1 from pos(          5,          0) addr=00000080
-[DEBUG] Read DATA: buffer[ 3] =        281 (0x00000119)
-[DEBUG] Read DATA: buffer[ 4] =       1190 (0x000004a6)
-[DEBUG] Read DATA: buffer[ 5] =       2899 (0x00000b53)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =        281 (0x00000119)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =       1190 (0x000004a6)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =       2899 (0x00000b53)
 [DEBUG] get_mirrored_addr: src(          6,          0) -> mirrored(          6,          1) offset=000000a0
 [DEBUG] Read REQ: block( 4, 0) center(          5,          1) reading row          2 from pos(          6,          0) addr=000000a0
-[DEBUG] Read DATA: buffer[ 6] =       3574 (0x00000df6)
-[DEBUG] Read DATA: buffer[ 7] =       3944 (0x00000f68)
-[DEBUG] Read DATA: buffer[ 8] =         20 (0x00000014)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =       3574 (0x00000df6)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =       3944 (0x00000f68)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =         20 (0x00000014)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] PREPARE: block( 4, 0) center(          5,          1)
 [DEBUG] Output positions: TL( 4, 0) TR( 4,         1) BL(         5, 0) BR(         5,         1)
@@ -380,17 +380,17 @@
 [DEBUG] Moving to next column: block( 4, 0)->( 4,         2) center(          5,          1)->(          5,         3)
 [DEBUG] Starting next block read
 [DEBUG] Read REQ: block( 4, 2) center(          5,          3) reading row          0 from pos(          4,          2) addr=00000064
-[DEBUG] Read DATA: buffer[ 0] =        508 (0x000001fc)
-[DEBUG] Read DATA: buffer[ 1] =       3775 (0x00000ebf)
-[DEBUG] Read DATA: buffer[ 2] =        607 (0x0000025f)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =        508 (0x000001fc)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =       3775 (0x00000ebf)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =        607 (0x0000025f)
 [DEBUG] Read REQ: block( 4, 2) center(          5,          3) reading row          1 from pos(          5,          2) addr=00000084
-[DEBUG] Read DATA: buffer[ 3] =       1190 (0x000004a6)
-[DEBUG] Read DATA: buffer[ 4] =       2899 (0x00000b53)
-[DEBUG] Read DATA: buffer[ 5] =       1775 (0x000006ef)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =       1190 (0x000004a6)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =       2899 (0x00000b53)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =       1775 (0x000006ef)
 [DEBUG] Read REQ: block( 4, 2) center(          5,          3) reading row          2 from pos(          6,          2) addr=000000a4
-[DEBUG] Read DATA: buffer[ 6] =       3944 (0x00000f68)
-[DEBUG] Read DATA: buffer[ 7] =         20 (0x00000014)
-[DEBUG] Read DATA: buffer[ 8] =       2671 (0x00000a6f)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =       3944 (0x00000f68)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =         20 (0x00000014)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =       2671 (0x00000a6f)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] PREPARE: block( 4, 2) center(          5,          3)
 [DEBUG] Output positions: TL( 4, 2) TR( 4,         3) BL(         5, 2) BR(         5,         3)
@@ -410,17 +410,17 @@
 [DEBUG] Moving to next column: block( 4, 2)->( 4,         4) center(          5,          3)->(          5,         5)
 [DEBUG] Starting next block read
 [DEBUG] Read REQ: block( 4, 4) center(          5,          5) reading row          0 from pos(          4,          4) addr=0000006c
-[DEBUG] Read DATA: buffer[ 0] =        607 (0x0000025f)
-[DEBUG] Read DATA: buffer[ 1] =       2177 (0x00000881)
-[DEBUG] Read DATA: buffer[ 2] =       2664 (0x00000a68)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =        607 (0x0000025f)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =       2177 (0x00000881)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =       2664 (0x00000a68)
 [DEBUG] Read REQ: block( 4, 4) center(          5,          5) reading row          1 from pos(          5,          4) addr=0000008c
-[DEBUG] Read DATA: buffer[ 3] =       1775 (0x000006ef)
-[DEBUG] Read DATA: buffer[ 4] =       3821 (0x00000eed)
-[DEBUG] Read DATA: buffer[ 5] =       3505 (0x00000db1)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =       1775 (0x000006ef)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =       3821 (0x00000eed)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =       3505 (0x00000db1)
 [DEBUG] Read REQ: block( 4, 4) center(          5,          5) reading row          2 from pos(          6,          4) addr=000000ac
-[DEBUG] Read DATA: buffer[ 6] =       2671 (0x00000a6f)
-[DEBUG] Read DATA: buffer[ 7] =       1578 (0x0000062a)
-[DEBUG] Read DATA: buffer[ 8] =       1854 (0x0000073e)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =       2671 (0x00000a6f)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =       1578 (0x0000062a)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =       1854 (0x0000073e)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] PREPARE: block( 4, 4) center(          5,          5)
 [DEBUG] Output positions: TL( 4, 4) TR( 4,         5) BL(         5, 4) BR(         5,         5)
@@ -440,17 +440,17 @@
 [DEBUG] Moving to next column: block( 4, 4)->( 4,         6) center(          5,          5)->(          5,         7)
 [DEBUG] Starting next block read
 [DEBUG] Read REQ: block( 4, 6) center(          5,          7) reading row          0 from pos(          4,          6) addr=00000074
-[DEBUG] Read DATA: buffer[ 0] =       2664 (0x00000a68)
-[DEBUG] Read DATA: buffer[ 1] =       2298 (0x000008fa)
-[DEBUG] Read DATA: buffer[ 2] =        251 (0x000000fb)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =       2664 (0x00000a68)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =       2298 (0x000008fa)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =        251 (0x000000fb)
 [DEBUG] Read REQ: block( 4, 6) center(          5,          7) reading row          1 from pos(          5,          6) addr=00000094
-[DEBUG] Read DATA: buffer[ 3] =       3505 (0x00000db1)
-[DEBUG] Read DATA: buffer[ 4] =       3684 (0x00000e64)
-[DEBUG] Read DATA: buffer[ 5] =         33 (0x00000021)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =       3505 (0x00000db1)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =       3684 (0x00000e64)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =         33 (0x00000021)
 [DEBUG] Read REQ: block( 4, 6) center(          5,          7) reading row          2 from pos(          6,          6) addr=000000b4
-[DEBUG] Read DATA: buffer[ 6] =       1854 (0x0000073e)
-[DEBUG] Read DATA: buffer[ 7] =       3831 (0x00000ef7)
-[DEBUG] Read DATA: buffer[ 8] =       3910 (0x00000f46)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =       1854 (0x0000073e)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =       3831 (0x00000ef7)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =       3910 (0x00000f46)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] PREPARE: block( 4, 6) center(          5,          7)
 [DEBUG] Output positions: TL( 4, 6) TR( 4,         7) BL(         5, 6) BR(         5,         7)
@@ -470,17 +470,17 @@
 [DEBUG] Moving to next column: block( 4, 6)->( 4,         8) center(          5,          7)->(          5,         8)
 [DEBUG] Starting next block read
 [DEBUG] Read REQ: block( 4, 8) center(          5,          8) reading row          0 from pos(          4,          7) addr=00000078
-[DEBUG] Read DATA: buffer[ 0] =       2298 (0x000008fa)
-[DEBUG] Read DATA: buffer[ 1] =        251 (0x000000fb)
-[DEBUG] Read DATA: buffer[ 2] =        281 (0x00000119)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =       2298 (0x000008fa)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =        251 (0x000000fb)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =        281 (0x00000119)
 [DEBUG] Read REQ: block( 4, 8) center(          5,          8) reading row          1 from pos(          5,          7) addr=00000098
-[DEBUG] Read DATA: buffer[ 3] =       3684 (0x00000e64)
-[DEBUG] Read DATA: buffer[ 4] =         33 (0x00000021)
-[DEBUG] Read DATA: buffer[ 5] =       3574 (0x00000df6)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =       3684 (0x00000e64)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =         33 (0x00000021)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =       3574 (0x00000df6)
 [DEBUG] Read REQ: block( 4, 8) center(          5,          8) reading row          2 from pos(          6,          7) addr=000000b8
-[DEBUG] Read DATA: buffer[ 6] =       3831 (0x00000ef7)
-[DEBUG] Read DATA: buffer[ 7] =       3910 (0x00000f46)
-[DEBUG] Read DATA: buffer[ 8] =       2621 (0x00000a3d)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =       3831 (0x00000ef7)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =       3910 (0x00000f46)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =       2621 (0x00000a3d)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] calc_output_value: out( 4, 8) -> src(          4,          8) -> rel(         -1,          0) vs center(          5,          8)
 [DEBUG] Buffer access: index=          1, value=       251
@@ -509,19 +509,19 @@
 [DEBUG] Starting next block read
 [DEBUG] get_mirrored_addr: src(          6,          0) -> mirrored(          6,          1) offset=000000a0
 [DEBUG] Read REQ: block( 6, 0) center(          7,          1) reading row          0 from pos(          6,          0) addr=000000a0
-[DEBUG] Read DATA: buffer[ 0] =       3574 (0x00000df6)
-[DEBUG] Read DATA: buffer[ 1] =       3944 (0x00000f68)
-[DEBUG] Read DATA: buffer[ 2] =         20 (0x00000014)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =       3574 (0x00000df6)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =       3944 (0x00000f68)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =         20 (0x00000014)
 [DEBUG] get_mirrored_addr: src(          7,          0) -> mirrored(          7,          1) offset=000000c0
 [DEBUG] Read REQ: block( 6, 0) center(          7,          1) reading row          1 from pos(          7,          0) addr=000000c0
-[DEBUG] Read DATA: buffer[ 3] =       2621 (0x00000a3d)
-[DEBUG] Read DATA: buffer[ 4] =        160 (0x000000a0)
-[DEBUG] Read DATA: buffer[ 5] =       1018 (0x000003fa)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =       2621 (0x00000a3d)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =        160 (0x000000a0)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =       1018 (0x000003fa)
 [DEBUG] get_mirrored_addr: src(          8,          0) -> mirrored(          8,          1) offset=000000e0
 [DEBUG] Read REQ: block( 6, 0) center(          7,          1) reading row          2 from pos(          8,          0) addr=000000e0
-[DEBUG] Read DATA: buffer[ 6] =       2601 (0x00000a29)
-[DEBUG] Read DATA: buffer[ 7] =       2319 (0x0000090f)
-[DEBUG] Read DATA: buffer[ 8] =        406 (0x00000196)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =       2601 (0x00000a29)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =       2319 (0x0000090f)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =        406 (0x00000196)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] PREPARE: block( 6, 0) center(          7,          1)
 [DEBUG] Output positions: TL( 6, 0) TR( 6,         1) BL(         7, 0) BR(         7,         1)
@@ -541,17 +541,17 @@
 [DEBUG] Moving to next column: block( 6, 0)->( 6,         2) center(          7,          1)->(          7,         3)
 [DEBUG] Starting next block read
 [DEBUG] Read REQ: block( 6, 2) center(          7,          3) reading row          0 from pos(          6,          2) addr=000000a4
-[DEBUG] Read DATA: buffer[ 0] =       3944 (0x00000f68)
-[DEBUG] Read DATA: buffer[ 1] =         20 (0x00000014)
-[DEBUG] Read DATA: buffer[ 2] =       2671 (0x00000a6f)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =       3944 (0x00000f68)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =         20 (0x00000014)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =       2671 (0x00000a6f)
 [DEBUG] Read REQ: block( 6, 2) center(          7,          3) reading row          1 from pos(          7,          2) addr=000000c4
-[DEBUG] Read DATA: buffer[ 3] =        160 (0x000000a0)
-[DEBUG] Read DATA: buffer[ 4] =       1018 (0x000003fa)
-[DEBUG] Read DATA: buffer[ 5] =       3572 (0x00000df4)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =        160 (0x000000a0)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =       1018 (0x000003fa)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =       3572 (0x00000df4)
 [DEBUG] Read REQ: block( 6, 2) center(          7,          3) reading row          2 from pos(          8,          2) addr=000000e4
-[DEBUG] Read DATA: buffer[ 6] =       2319 (0x0000090f)
-[DEBUG] Read DATA: buffer[ 7] =        406 (0x00000196)
-[DEBUG] Read DATA: buffer[ 8] =       3543 (0x00000dd7)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =       2319 (0x0000090f)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =        406 (0x00000196)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =       3543 (0x00000dd7)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] PREPARE: block( 6, 2) center(          7,          3)
 [DEBUG] Output positions: TL( 6, 2) TR( 6,         3) BL(         7, 2) BR(         7,         3)
@@ -571,17 +571,17 @@
 [DEBUG] Moving to next column: block( 6, 2)->( 6,         4) center(          7,          3)->(          7,         5)
 [DEBUG] Starting next block read
 [DEBUG] Read REQ: block( 6, 4) center(          7,          5) reading row          0 from pos(          6,          4) addr=000000ac
-[DEBUG] Read DATA: buffer[ 0] =       2671 (0x00000a6f)
-[DEBUG] Read DATA: buffer[ 1] =       1578 (0x0000062a)
-[DEBUG] Read DATA: buffer[ 2] =       1854 (0x0000073e)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =       2671 (0x00000a6f)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =       1578 (0x0000062a)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =       1854 (0x0000073e)
 [DEBUG] Read REQ: block( 6, 4) center(          7,          5) reading row          1 from pos(          7,          4) addr=000000cc
-[DEBUG] Read DATA: buffer[ 3] =       3572 (0x00000df4)
-[DEBUG] Read DATA: buffer[ 4] =        819 (0x00000333)
-[DEBUG] Read DATA: buffer[ 5] =       1792 (0x00000700)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =       3572 (0x00000df4)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =        819 (0x00000333)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =       1792 (0x00000700)
 [DEBUG] Read REQ: block( 6, 4) center(          7,          5) reading row          2 from pos(          8,          4) addr=000000ec
-[DEBUG] Read DATA: buffer[ 6] =       3543 (0x00000dd7)
-[DEBUG] Read DATA: buffer[ 7] =        291 (0x00000123)
-[DEBUG] Read DATA: buffer[ 8] =       3590 (0x00000e06)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =       3543 (0x00000dd7)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =        291 (0x00000123)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =       3590 (0x00000e06)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] PREPARE: block( 6, 4) center(          7,          5)
 [DEBUG] Output positions: TL( 6, 4) TR( 6,         5) BL(         7, 4) BR(         7,         5)
@@ -601,17 +601,17 @@
 [DEBUG] Moving to next column: block( 6, 4)->( 6,         6) center(          7,          5)->(          7,         7)
 [DEBUG] Starting next block read
 [DEBUG] Read REQ: block( 6, 6) center(          7,          7) reading row          0 from pos(          6,          6) addr=000000b4
-[DEBUG] Read DATA: buffer[ 0] =       1854 (0x0000073e)
-[DEBUG] Read DATA: buffer[ 1] =       3831 (0x00000ef7)
-[DEBUG] Read DATA: buffer[ 2] =       3910 (0x00000f46)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =       1854 (0x0000073e)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =       3831 (0x00000ef7)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =       3910 (0x00000f46)
 [DEBUG] Read REQ: block( 6, 6) center(          7,          7) reading row          1 from pos(          7,          6) addr=000000d4
-[DEBUG] Read DATA: buffer[ 3] =       1792 (0x00000700)
-[DEBUG] Read DATA: buffer[ 4] =       3036 (0x00000bdc)
-[DEBUG] Read DATA: buffer[ 5] =       3440 (0x00000d70)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =       1792 (0x00000700)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =       3036 (0x00000bdc)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =       3440 (0x00000d70)
 [DEBUG] Read REQ: block( 6, 6) center(          7,          7) reading row          2 from pos(          8,          6) addr=000000f4
-[DEBUG] Read DATA: buffer[ 6] =       3590 (0x00000e06)
-[DEBUG] Read DATA: buffer[ 7] =         74 (0x0000004a)
-[DEBUG] Read DATA: buffer[ 8] =       2378 (0x0000094a)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =       3590 (0x00000e06)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =         74 (0x0000004a)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =       2378 (0x0000094a)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] PREPARE: block( 6, 6) center(          7,          7)
 [DEBUG] Output positions: TL( 6, 6) TR( 6,         7) BL(         7, 6) BR(         7,         7)
@@ -631,17 +631,17 @@
 [DEBUG] Moving to next column: block( 6, 6)->( 6,         8) center(          7,          7)->(          7,         8)
 [DEBUG] Starting next block read
 [DEBUG] Read REQ: block( 6, 8) center(          7,          8) reading row          0 from pos(          6,          7) addr=000000b8
-[DEBUG] Read DATA: buffer[ 0] =       3831 (0x00000ef7)
-[DEBUG] Read DATA: buffer[ 1] =       3910 (0x00000f46)
-[DEBUG] Read DATA: buffer[ 2] =       2621 (0x00000a3d)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =       3831 (0x00000ef7)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =       3910 (0x00000f46)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =       2621 (0x00000a3d)
 [DEBUG] Read REQ: block( 6, 8) center(          7,          8) reading row          1 from pos(          7,          7) addr=000000d8
-[DEBUG] Read DATA: buffer[ 3] =       3036 (0x00000bdc)
-[DEBUG] Read DATA: buffer[ 4] =       3440 (0x00000d70)
-[DEBUG] Read DATA: buffer[ 5] =       2601 (0x00000a29)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =       3036 (0x00000bdc)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =       3440 (0x00000d70)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =       2601 (0x00000a29)
 [DEBUG] Read REQ: block( 6, 8) center(          7,          8) reading row          2 from pos(          8,          7) addr=000000f8
-[DEBUG] Read DATA: buffer[ 6] =         74 (0x0000004a)
-[DEBUG] Read DATA: buffer[ 7] =       2378 (0x0000094a)
-[DEBUG] Read DATA: buffer[ 8] =         98 (0x00000062)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =         74 (0x0000004a)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =       2378 (0x0000094a)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =         98 (0x00000062)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] calc_output_value: out( 6, 8) -> src(          6,          8) -> rel(         -1,          0) vs center(          7,          8)
 [DEBUG] Buffer access: index=          1, value=      3910
@@ -670,19 +670,19 @@
 [DEBUG] Starting next block read
 [DEBUG] get_mirrored_addr: src(          7,          0) -> mirrored(          7,          1) offset=000000c0
 [DEBUG] Read REQ: block( 8, 0) center(          8,          1) reading row          0 from pos(          7,          0) addr=000000c0
-[DEBUG] Read DATA: buffer[ 0] =       2621 (0x00000a3d)
-[DEBUG] Read DATA: buffer[ 1] =        160 (0x000000a0)
-[DEBUG] Read DATA: buffer[ 2] =       1018 (0x000003fa)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =       2621 (0x00000a3d)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =        160 (0x000000a0)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =       1018 (0x000003fa)
 [DEBUG] get_mirrored_addr: src(          8,          0) -> mirrored(          8,          1) offset=000000e0
 [DEBUG] Read REQ: block( 8, 0) center(          8,          1) reading row          1 from pos(          8,          0) addr=000000e0
-[DEBUG] Read DATA: buffer[ 3] =       2601 (0x00000a29)
-[DEBUG] Read DATA: buffer[ 4] =       2319 (0x0000090f)
-[DEBUG] Read DATA: buffer[ 5] =        406 (0x00000196)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =       2601 (0x00000a29)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =       2319 (0x0000090f)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =        406 (0x00000196)
 [DEBUG] get_mirrored_addr: src(          9,          0) -> mirrored(          8,          1) offset=000000e0
 [DEBUG] Read REQ: block( 8, 0) center(          8,          1) reading row          2 from pos(          9,          0) addr=000000e0
-[DEBUG] Read DATA: buffer[ 6] =       2601 (0x00000a29)
-[DEBUG] Read DATA: buffer[ 7] =       2319 (0x0000090f)
-[DEBUG] Read DATA: buffer[ 8] =        406 (0x00000196)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =       2601 (0x00000a29)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =       2319 (0x0000090f)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =        406 (0x00000196)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] calc_output_value: out( 8, 0) -> src(          8,          2) -> rel(          0,          1) vs center(          8,          1)
 [DEBUG] Buffer access: index=          5, value=       406
@@ -710,18 +710,18 @@
 [DEBUG] Moving to next column: block( 8, 0)->( 8,         2) center(          8,          1)->(          8,         3)
 [DEBUG] Starting next block read
 [DEBUG] Read REQ: block( 8, 2) center(          8,          3) reading row          0 from pos(          7,          2) addr=000000c4
-[DEBUG] Read DATA: buffer[ 0] =        160 (0x000000a0)
-[DEBUG] Read DATA: buffer[ 1] =       1018 (0x000003fa)
-[DEBUG] Read DATA: buffer[ 2] =       3572 (0x00000df4)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =        160 (0x000000a0)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =       1018 (0x000003fa)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =       3572 (0x00000df4)
 [DEBUG] Read REQ: block( 8, 2) center(          8,          3) reading row          1 from pos(          8,          2) addr=000000e4
-[DEBUG] Read DATA: buffer[ 3] =       2319 (0x0000090f)
-[DEBUG] Read DATA: buffer[ 4] =        406 (0x00000196)
-[DEBUG] Read DATA: buffer[ 5] =       3543 (0x00000dd7)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =       2319 (0x0000090f)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =        406 (0x00000196)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =       3543 (0x00000dd7)
 [DEBUG] get_mirrored_addr: src(          9,          2) -> mirrored(          8,          2) offset=000000e4
 [DEBUG] Read REQ: block( 8, 2) center(          8,          3) reading row          2 from pos(          9,          2) addr=000000e4
-[DEBUG] Read DATA: buffer[ 6] =       2319 (0x0000090f)
-[DEBUG] Read DATA: buffer[ 7] =        406 (0x00000196)
-[DEBUG] Read DATA: buffer[ 8] =       3543 (0x00000dd7)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =       2319 (0x0000090f)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =        406 (0x00000196)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =       3543 (0x00000dd7)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] calc_output_value: out( 8, 2) -> src(          8,          2) -> rel(          0,         -1) vs center(          8,          3)
 [DEBUG] Buffer access: index=          3, value=      2319
@@ -749,18 +749,18 @@
 [DEBUG] Moving to next column: block( 8, 2)->( 8,         4) center(          8,          3)->(          8,         5)
 [DEBUG] Starting next block read
 [DEBUG] Read REQ: block( 8, 4) center(          8,          5) reading row          0 from pos(          7,          4) addr=000000cc
-[DEBUG] Read DATA: buffer[ 0] =       3572 (0x00000df4)
-[DEBUG] Read DATA: buffer[ 1] =        819 (0x00000333)
-[DEBUG] Read DATA: buffer[ 2] =       1792 (0x00000700)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =       3572 (0x00000df4)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =        819 (0x00000333)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =       1792 (0x00000700)
 [DEBUG] Read REQ: block( 8, 4) center(          8,          5) reading row          1 from pos(          8,          4) addr=000000ec
-[DEBUG] Read DATA: buffer[ 3] =       3543 (0x00000dd7)
-[DEBUG] Read DATA: buffer[ 4] =        291 (0x00000123)
-[DEBUG] Read DATA: buffer[ 5] =       3590 (0x00000e06)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =       3543 (0x00000dd7)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =        291 (0x00000123)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =       3590 (0x00000e06)
 [DEBUG] get_mirrored_addr: src(          9,          4) -> mirrored(          8,          4) offset=000000ec
 [DEBUG] Read REQ: block( 8, 4) center(          8,          5) reading row          2 from pos(          9,          4) addr=000000ec
-[DEBUG] Read DATA: buffer[ 6] =       3543 (0x00000dd7)
-[DEBUG] Read DATA: buffer[ 7] =        291 (0x00000123)
-[DEBUG] Read DATA: buffer[ 8] =       3590 (0x00000e06)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =       3543 (0x00000dd7)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =        291 (0x00000123)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =       3590 (0x00000e06)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] calc_output_value: out( 8, 4) -> src(          8,          4) -> rel(          0,         -1) vs center(          8,          5)
 [DEBUG] Buffer access: index=          3, value=      3543
@@ -788,18 +788,18 @@
 [DEBUG] Moving to next column: block( 8, 4)->( 8,         6) center(          8,          5)->(          8,         7)
 [DEBUG] Starting next block read
 [DEBUG] Read REQ: block( 8, 6) center(          8,          7) reading row          0 from pos(          7,          6) addr=000000d4
-[DEBUG] Read DATA: buffer[ 0] =       1792 (0x00000700)
-[DEBUG] Read DATA: buffer[ 1] =       3036 (0x00000bdc)
-[DEBUG] Read DATA: buffer[ 2] =       3440 (0x00000d70)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =       1792 (0x00000700)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =       3036 (0x00000bdc)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =       3440 (0x00000d70)
 [DEBUG] Read REQ: block( 8, 6) center(          8,          7) reading row          1 from pos(          8,          6) addr=000000f4
-[DEBUG] Read DATA: buffer[ 3] =       3590 (0x00000e06)
-[DEBUG] Read DATA: buffer[ 4] =         74 (0x0000004a)
-[DEBUG] Read DATA: buffer[ 5] =       2378 (0x0000094a)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =       3590 (0x00000e06)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =         74 (0x0000004a)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =       2378 (0x0000094a)
 [DEBUG] get_mirrored_addr: src(          9,          6) -> mirrored(          8,          6) offset=000000f4
 [DEBUG] Read REQ: block( 8, 6) center(          8,          7) reading row          2 from pos(          9,          6) addr=000000f4
-[DEBUG] Read DATA: buffer[ 6] =       3590 (0x00000e06)
-[DEBUG] Read DATA: buffer[ 7] =         74 (0x0000004a)
-[DEBUG] Read DATA: buffer[ 8] =       2378 (0x0000094a)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =       3590 (0x00000e06)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =         74 (0x0000004a)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =       2378 (0x0000094a)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] calc_output_value: out( 8, 6) -> src(          8,          6) -> rel(          0,         -1) vs center(          8,          7)
 [DEBUG] Buffer access: index=          3, value=      3590
@@ -827,18 +827,18 @@
 [DEBUG] Moving to next column: block( 8, 6)->( 8,         8) center(          8,          7)->(          8,         8)
 [DEBUG] Starting next block read
 [DEBUG] Read REQ: block( 8, 8) center(          8,          8) reading row          0 from pos(          7,          7) addr=000000d8
-[DEBUG] Read DATA: buffer[ 0] =       3036 (0x00000bdc)
-[DEBUG] Read DATA: buffer[ 1] =       3440 (0x00000d70)
-[DEBUG] Read DATA: buffer[ 2] =       2601 (0x00000a29)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =       3036 (0x00000bdc)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =       3440 (0x00000d70)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =       2601 (0x00000a29)
 [DEBUG] Read REQ: block( 8, 8) center(          8,          8) reading row          1 from pos(          8,          7) addr=000000f8
-[DEBUG] Read DATA: buffer[ 3] =         74 (0x0000004a)
-[DEBUG] Read DATA: buffer[ 4] =       2378 (0x0000094a)
-[DEBUG] Read DATA: buffer[ 5] =         98 (0x00000062)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =         74 (0x0000004a)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =       2378 (0x0000094a)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =         98 (0x00000062)
 [DEBUG] get_mirrored_addr: src(          9,          7) -> mirrored(          8,          7) offset=000000f8
 [DEBUG] Read REQ: block( 8, 8) center(          8,          8) reading row          2 from pos(          9,          7) addr=000000f8
-[DEBUG] Read DATA: buffer[ 6] =         74 (0x0000004a)
-[DEBUG] Read DATA: buffer[ 7] =       2378 (0x0000094a)
-[DEBUG] Read DATA: buffer[ 8] =         98 (0x00000062)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =         74 (0x0000004a)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =       2378 (0x0000094a)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =         98 (0x00000062)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] calc_output_value: out( 8, 8) -> src(          8,          8) -> rel(          0,          0) vs center(          8,          8)
 [DEBUG] Buffer access: index=          4, value=      2378
@@ -867,19 +867,19 @@
 [DEBUG] Starting next block read
 [DEBUG] get_mirrored_addr: src(          7,          0) -> mirrored(          7,          1) offset=000000c0
 [DEBUG] Read REQ: block(10, 0) center(          8,          1) reading row          0 from pos(          7,          0) addr=000000c0
-[DEBUG] Read DATA: buffer[ 0] =       2621 (0x00000a3d)
-[DEBUG] Read DATA: buffer[ 1] =        160 (0x000000a0)
-[DEBUG] Read DATA: buffer[ 2] =       1018 (0x000003fa)
+[DEBUG] Read DATA: buffer[         0] (row= 0,col= 0) =       2621 (0x00000a3d)
+[DEBUG] Read DATA: buffer[         1] (row= 0,col= 1) =        160 (0x000000a0)
+[DEBUG] Read DATA: buffer[         2] (row= 0,col= 2) =       1018 (0x000003fa)
 [DEBUG] get_mirrored_addr: src(          8,          0) -> mirrored(          8,          1) offset=000000e0
 [DEBUG] Read REQ: block(10, 0) center(          8,          1) reading row          1 from pos(          8,          0) addr=000000e0
-[DEBUG] Read DATA: buffer[ 3] =       2601 (0x00000a29)
-[DEBUG] Read DATA: buffer[ 4] =       2319 (0x0000090f)
-[DEBUG] Read DATA: buffer[ 5] =        406 (0x00000196)
+[DEBUG] Read DATA: buffer[         3] (row= 1,col= 0) =       2601 (0x00000a29)
+[DEBUG] Read DATA: buffer[         4] (row= 1,col= 1) =       2319 (0x0000090f)
+[DEBUG] Read DATA: buffer[         5] (row= 1,col= 2) =        406 (0x00000196)
 [DEBUG] get_mirrored_addr: src(          9,          0) -> mirrored(          8,          1) offset=000000e0
 [DEBUG] Read REQ: block(10, 0) center(          8,          1) reading row          2 from pos(          9,          0) addr=000000e0
-[DEBUG] Read DATA: buffer[ 6] =       2601 (0x00000a29)
-[DEBUG] Read DATA: buffer[ 7] =       2319 (0x0000090f)
-[DEBUG] Read DATA: buffer[ 8] =        406 (0x00000196)
+[DEBUG] Read DATA: buffer[         6] (row= 2,col= 0) =       2601 (0x00000a29)
+[DEBUG] Read DATA: buffer[         7] (row= 2,col= 1) =       2319 (0x0000090f)
+[DEBUG] Read DATA: buffer[         8] (row= 2,col= 2) =        406 (0x00000196)
 [DEBUG] All 3x3 data read, moving to PREPARE
 [DEBUG] calc_output_value: out(10, 0) -> src(         10,          2) -> rel(          2,          1) vs center(          8,          1)
 [DEBUG] ERROR: out_of_range out(10, 0) rel(          2,          1) center(          8,          1)
