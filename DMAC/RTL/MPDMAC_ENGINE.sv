@@ -201,21 +201,50 @@ module MPDMAC_ENGINE
         input [3:0] btype;
         reg [5:0] dst_row, dst_col;
         begin
-            // 패딩된 매트릭스에서의 시작 위치 계산
+            // 패딩된 매트릭스에서의 올바른 시작 위치 계산
             case (btype)
-                TYPE_TL, TYPE_TR, TYPE_BL, TYPE_BR: begin
+                TYPE_TL: begin
+                    // TL: (0,0)에서 시작
                     dst_row = by * 4 + wrow;
                     dst_col = bx * 4;
                 end
-                TYPE_T, TYPE_B: begin
+                TYPE_TR: begin  
+                    // TR: (4,0)에서 시작
+                    dst_row = by * 4 + wrow;
+                    dst_col = bx * 4;
+                end
+                TYPE_BL: begin
+                    // BL: (0,4)에서 시작  
+                    dst_row = by * 4 + 4 + wrow;
+                    dst_col = bx * 4;
+                end
+                TYPE_BR: begin
+                    // BR: (4,4)에서 시작
+                    dst_row = by * 4 + 4 + wrow;
+                    dst_col = bx * 4;
+                end
+                TYPE_T: begin
+                    // T: (1,0)에서 시작 (top padding)
                     dst_row = by * 4 + wrow;
                     dst_col = bx * 4 + 1;
                 end
-                TYPE_L, TYPE_R: begin
+                TYPE_B: begin
+                    // B: (1,5)에서 시작 (bottom padding)
+                    dst_row = by * 4 + 5 + wrow;
+                    dst_col = bx * 4 + 1;
+                end
+                TYPE_L: begin
+                    // L: (0,1)에서 시작 (left padding)
                     dst_row = by * 4 + 1 + wrow;
                     dst_col = bx * 4;
                 end
+                TYPE_R: begin
+                    // R: (5,1)에서 시작 (right padding)
+                    dst_row = by * 4 + 1 + wrow;
+                    dst_col = bx * 4 + 5;
+                end
                 TYPE_INNER: begin
+                    // INNER: (1,1)에서 시작 (no padding)
                     dst_row = by * 4 + 1 + wrow;
                     dst_col = bx * 4 + 1;
                 end
