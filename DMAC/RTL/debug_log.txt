@@ -54,11 +54,11 @@
 [DEBUG] Processing block type  0, output_len=25
 [DEBUG] Write REQ: block( 0, 0), len= 8, addr=00000a00
 [DEBUG] Write DATA[ 0] =        607
-[DEBUG] Write DATA[ 1] =        633
-[DEBUG] Write DATA[ 2] =        205
-[DEBUG] Write DATA[ 3] =       3218
-[DEBUG] Write DATA[ 4] =        806
-[DEBUG] Write DATA[ 5] =        633
+[DEBUG] Write DATA[ 1] =        587
+[DEBUG] Write DATA[ 2] =        443
+[DEBUG] Write DATA[ 3] =       2433
+[DEBUG] Write DATA[ 4] =        870
+[DEBUG] Write DATA[ 5] =        205
 [DEBUG] Write DATA[ 6] =        633
 [DEBUG] Write DATA[ 7] =        205
 [DEBUG] Write DATA[ 8] =       3218
@@ -116,10 +116,10 @@
 [DEBUG] Processing block type  1, output_len=25
 [DEBUG] Write REQ: block( 1, 0), len= 8, addr=00000a10
 [DEBUG] Write DATA[ 0] =       2177
-[DEBUG] Write DATA[ 1] =       3230
-[DEBUG] Write DATA[ 2] =       3037
-[DEBUG] Write DATA[ 3] =       3520
-[DEBUG] Write DATA[ 4] =       3520
+[DEBUG] Write DATA[ 1] =       2315
+[DEBUG] Write DATA[ 2] =        328
+[DEBUG] Write DATA[ 3] =        225
+[DEBUG] Write DATA[ 4] =        328
 [DEBUG] Write DATA[ 5] =       2729
 [DEBUG] Write DATA[ 6] =       3230
 [DEBUG] Write DATA[ 7] =       3037
@@ -181,8 +181,8 @@
 [DEBUG] Write DATA[ 1] =        281
 [DEBUG] Write DATA[ 2] =       1190
 [DEBUG] Write DATA[ 3] =       2899
-[DEBUG] Write DATA[ 4] =       3520
-[DEBUG] Write DATA[ 5] =       3574
+[DEBUG] Write DATA[ 4] =        328
+[DEBUG] Write DATA[ 5] =       3944
 [DEBUG] Write DATA[ 6] =       3574
 [DEBUG] Write DATA[ 7] =       3944
 [DEBUG] Write DATA[ 8] =         20

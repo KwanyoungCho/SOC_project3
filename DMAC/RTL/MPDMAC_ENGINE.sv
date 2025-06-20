@@ -372,18 +372,13 @@ module MPDMAC_ENGINE
             end
             
             S_RREQ: begin
-                if (!all_blocks_done) begin
-                    arvalid = 1'b1;
-                    if (ar_handshake) begin
-                        state_n = S_RDATA;
-                        read_col_n = 2'd0;
-                        
-                        $display("[DEBUG] Read REQ: block(%d,%d), row=%d, addr=%h", 
-                                block_x, block_y, read_row, araddr_o);
-                    end
-                end else begin
-                    state_n = S_IDLE;
-                    $display("[DEBUG] All blocks completed!");
+                arvalid = 1'b1;
+                if (ar_handshake) begin
+                    state_n = S_RDATA;
+                    read_col_n = 2'd0;
+                    
+                    $display("[DEBUG] Read REQ: block(%d,%d), row=%d, addr=%h", 
+                            block_x, block_y, read_row, araddr_o);
                 end
             end
             
