@@ -56,17 +56,13 @@ module MPDMAC_ENGINE
     output  wire                        rready_o
 );
 
-    // State Machine
-    localparam S_IDLE           = 3'd0;
-    localparam S_READ_ADDR      = 3'd1;
-    localparam S_READ_DATA      = 3'd2;
-    localparam S_APPLY_PADDING  = 3'd3;
-    localparam S_WRITE_ADDR     = 3'd4;
-    localparam S_WRITE_DATA     = 3'd5;
-    localparam S_WRITE_RESP     = 3'd6;
-    localparam S_NEXT_BLOCK     = 3'd7;
+    // State Machine - 행별로 처리
+    localparam S_IDLE           = 2'd0;
+    localparam S_READ_ROW       = 2'd1;
+    localparam S_WRITE_ROW      = 2'd2;
+    localparam S_NEXT_ROW       = 2'd3;
 
-    reg [2:0] state;
+    reg [1:0] state;
     
     // Configuration registers
     reg [31:0] src_addr;
@@ -74,23 +70,20 @@ module MPDMAC_ENGINE
     reg [5:0]  mat_width;
     reg        done;
     
-    // Current 4x4 block position in source matrix (0-based)
-    reg [5:0]  block_row;  
-    reg [5:0]  block_col;  
+    // Current processing row (0 to mat_width+1)
+    reg [5:0]  current_row;
     
-    // 4x4 source buffer and 5x5 padded buffer
-    reg [31:0] src_buffer_4x4 [0:15];  // 4x4 source data
-    reg [31:0] padded_buffer_5x5 [0:24]; // 5x5 with mirror padding
+    // Source row buffer (entire row)
+    reg [31:0] src_row_buffer [0:63]; // 최대 64개 원소
     
-    // Read state - similar to SGDMAC_READ
-    reg [1:0]  read_row;       // Current row being read (0-3)
-    reg [3:0]  read_burst_cnt; // Burst counter for current row
-    reg [31:0] read_addr;      // Current read address
+    // Read state
+    reg [5:0]  read_cnt;
+    reg [31:0] read_addr;
     
-    // Write state - similar to SGDMAC_WRITE
-    reg [1:0]  write_row;      // Current row being written (0-3)
-    reg [3:0]  write_burst_cnt; // Burst counter for current row
-    reg [31:0] write_addr;     // Current write address
+    // Write state 
+    reg [5:0]  write_cnt;
+    reg [31:0] write_addr;
+    reg [31:0] write_data;
     
     // Handshake signals
     wire ar_handshake = arvalid_o & arready_i;
@@ -100,113 +93,99 @@ module MPDMAC_ENGINE
     wire b_handshake = bvalid_i & bready_o;
     
     // Control signals
-    wire burst_complete = r_handshake & rlast_i;
-    wire write_burst_done = w_handshake & wlast_o;
-    wire is_last_write_beat = (write_burst_cnt == 4'd0);
+    wire read_complete = r_handshake & rlast_i;
+    wire write_complete = w_handshake & wlast_o;
+    wire is_last_read = (read_cnt == mat_width - 1);
+    wire is_last_write = (write_cnt == mat_width + 1);
     
     // Output assignments
     assign done_o = done;
     
-    // AXI AR channel - similar to SGDMAC_READ
+    // AXI AR channel
     assign arid_o = 4'd0;
     assign araddr_o = read_addr;
-    assign arlen_o = 4'd3;      // Always 4 beats for 4x4 read
-    assign arsize_o = 3'b010;   // 4 bytes
-    assign arburst_o = 2'b01;   // INCR
-    assign arvalid_o = (state == S_READ_ADDR);
-    assign rready_o = (state == S_READ_DATA);
+    assign arlen_o = mat_width - 1;  // Read entire source row
+    assign arsize_o = 3'b010;        // 4 bytes
+    assign arburst_o = 2'b01;        // INCR
+    assign arvalid_o = (state == S_READ_ROW) && (current_row < mat_width);
+    assign rready_o = (state == S_READ_ROW);
     
-    // AXI AW channel - similar to SGDMAC_WRITE
+    // AXI AW channel
     assign awid_o = 4'd0;
     assign awaddr_o = write_addr;
-    assign awlen_o = 4'd3;      // Always 4 beats for 4x4 write
-    assign awsize_o = 3'b010;   // 4 bytes
-    assign awburst_o = 2'b01;   // INCR
-    assign awvalid_o = (state == S_WRITE_ADDR);
+    assign awlen_o = mat_width + 1;  // Write entire output row (width+2)
+    assign awsize_o = 3'b010;        // 4 bytes
+    assign awburst_o = 2'b01;        // INCR
+    assign awvalid_o = (state == S_WRITE_ROW);
     
-    // AXI W channel - similar to SGDMAC_WRITE
+    // AXI W channel
     assign wid_o = 4'd0;
-    assign wdata_o = padded_buffer_5x5[(write_row + 1) * 5 + (3 - write_burst_cnt + 1)];
+    assign wdata_o = write_data;
     assign wstrb_o = 4'hF;
-    assign wlast_o = (state == S_WRITE_DATA) & is_last_write_beat;
-    assign wvalid_o = (state == S_WRITE_DATA);
-    assign bready_o = (state == S_WRITE_DATA) | (state == S_WRITE_RESP);
+    assign wlast_o = (state == S_WRITE_ROW) & is_last_write;
+    assign wvalid_o = (state == S_WRITE_ROW);
+    assign bready_o = (state == S_WRITE_ROW);
     
-    // Mirror padding function
-    function [31:0] get_src_value;
-        input signed [6:0] src_r;  // 0-based source row (can be negative or > width)
-        input signed [6:0] src_c;  // 0-based source col (can be negative or > width)
+    // Mirror padding function - 출력 위치에서 소스 값 계산
+    function [31:0] get_padded_value;
+        input [5:0] out_row;  // 0-based output row (0 to width+1)
+        input [5:0] out_col;  // 0-based output col (0 to width+1)  
         input [5:0] width;
-        reg [5:0] safe_r, safe_c;
-        reg [3:0] buf_r, buf_c;
+        reg [5:0] src_row, src_col;
         begin
-            // Mirror padding logic for boundaries
-            if (src_r < 0) begin
-                safe_r = 0;  // Top boundary: use first row
-            end else if (src_r >= width) begin
-                safe_r = width - 1;  // Bottom boundary: use last row
+            // Mirror padding mapping
+            if (out_row == 0) begin
+                src_row = 1;  // out[0] -> src[1]
+            end else if (out_row == width + 1) begin
+                src_row = width - 2;  // out[width+1] -> src[width-2]
             end else begin
-                safe_r = src_r;  // Normal case
+                src_row = out_row - 1;  // out[1..width] -> src[0..width-1]
             end
             
-            if (src_c < 0) begin
-                safe_c = 0;  // Left boundary: use first col
-            end else if (src_c >= width) begin
-                safe_c = width - 1;  // Right boundary: use last col
+            if (out_col == 0) begin
+                src_col = 1;  // out[0] -> src[1]  
+            end else if (out_col == width + 1) begin
+                src_col = width - 2;  // out[width+1] -> src[width-2]
             end else begin
-                safe_c = src_c;  // Normal case
+                src_col = out_col - 1;  // out[1..width] -> src[0..width-1]
             end
             
-            // Map to current 4x4 buffer coordinates
-            if (safe_r < block_row) begin
-                buf_r = 0;  // Use top row of buffer
-            end else if (safe_r >= block_row + 4) begin
-                buf_r = 3;  // Use bottom row of buffer
+            // Get value from appropriate source row buffer
+            if (src_row == current_row && current_row < width) begin
+                get_padded_value = src_row_buffer[src_col];
             end else begin
-                buf_r = safe_r - block_row;
-            end
-            
-            if (safe_c < block_col) begin
-                buf_c = 0;  // Use left col of buffer
-            end else if (safe_c >= block_col + 4) begin
-                buf_c = 3;  // Use right col of buffer
-            end else begin
-                buf_c = safe_c - block_col;
-            end
-            
-            get_src_value = src_buffer_4x4[buf_r * 4 + buf_c];
-        end
-    endfunction
-    
-    // Apply mirror padding to create 5x5 buffer
-    task apply_mirror_padding;
-        integer i, j;
-        reg signed [6:0] src_r, src_c;
-        begin
-            for (i = 0; i < 5; i = i + 1) begin
-                for (j = 0; j < 5; j = j + 1) begin
-                    // 5x5 버퍼의 (i,j) 위치에 해당하는 소스 좌표 계산
-                    src_r = block_row + i - 1;  // -1, 0, 1, 2, 3, 4
-                    src_c = block_col + j - 1;  // -1, 0, 1, 2, 3, 4
-                    
-                    padded_buffer_5x5[i * 5 + j] = get_src_value(src_r, src_c, mat_width);
+                // For boundary rows, use previously read data or repeat logic
+                if (current_row == 0) begin
+                    // First output row (all mirror from src row 1)
+                    get_padded_value = src_row_buffer[src_col];
+                end else if (current_row == width + 1) begin
+                    // Last output row (all mirror from src row width-2) 
+                    get_padded_value = src_row_buffer[src_col];
+                end else begin
+                    get_padded_value = src_row_buffer[src_col];
                 end
             end
         end
-    endtask
+    endfunction
     
-    // Calculate output address
-    function [31:0] calc_output_addr;
-        input [5:0] out_r;  // 0-based output row
-        input [5:0] out_c;  // 0-based output col
+    // Calculate addresses
+    function [31:0] calc_src_addr;
+        input [5:0] row;
         input [5:0] width;
         begin
-            // Output matrix size: (width+2) x (width+2)
-            calc_output_addr = dst_addr + (out_r * (width + 2) + out_c) * 4;
+            calc_src_addr = src_addr + (row * width) * 4;
         end
     endfunction
     
-    // Main state machine - based on SGDMAC pattern
+    function [31:0] calc_dst_addr;
+        input [5:0] row;
+        input [5:0] width;
+        begin
+            calc_dst_addr = dst_addr + (row * (width + 2)) * 4;
+        end
+    endfunction
+    
+    // Main state machine
     always @(posedge clk) begin
         if (!rst_n) begin
             state <= S_IDLE;
@@ -214,17 +193,12 @@ module MPDMAC_ENGINE
             dst_addr <= 32'd0;
             mat_width <= 6'd0;
             done <= 1'b1;
-            
-            block_row <= 6'd0;
-            block_col <= 6'd0;
-            
-            read_row <= 2'd0;
-            read_burst_cnt <= 4'd0;
+            current_row <= 6'd0;
+            read_cnt <= 6'd0;
+            write_cnt <= 6'd0;
             read_addr <= 32'd0;
-            
-            write_row <= 2'd0;
-            write_burst_cnt <= 4'd0;
             write_addr <= 32'd0;
+            write_data <= 32'd0;
         end else begin
             case (state)
                 S_IDLE: begin
@@ -233,138 +207,91 @@ module MPDMAC_ENGINE
                         src_addr <= src_addr_i;
                         dst_addr <= dst_addr_i;
                         mat_width <= mat_width_i;
-                        block_row <= 6'd0;
-                        block_col <= 6'd0;
-                        read_row <= 2'd0;
-                        
-                        // Calculate first read address
-                        read_addr <= src_addr_i + (block_row * mat_width_i + block_col) * 4;
+                        current_row <= 6'd0;
                         
                         $display("[DEBUG] Starting DMA: src=%h, dst=%h, width=%d", src_addr_i, dst_addr_i, mat_width_i);
-                        state <= S_READ_ADDR;
+                        
+                        // Start with first row processing
+                        read_addr <= calc_src_addr(6'd1, mat_width_i); // Read src row 1 for output row 0
+                        state <= S_READ_ROW;
+                        read_cnt <= 6'd0;
                     end else begin
                         done <= 1'b1;
                     end
                 end
                 
-                S_READ_ADDR: begin
-                    if (ar_handshake) begin
-                        state <= S_READ_DATA;
-                        read_burst_cnt <= 4'd3; // 4 beats: 3, 2, 1, 0
+                S_READ_ROW: begin
+                    if (current_row < mat_width) begin
+                        // Read source row
+                        if (ar_handshake) begin
+                            $display("[DEBUG] Read ROW: output_row=%d, src_row=%d, addr=%h", 
+                                     current_row, 
+                                     (current_row == 0) ? 1 : 
+                                     (current_row == mat_width + 1) ? mat_width - 2 : current_row - 1, 
+                                     read_addr);
+                        end
                         
-                        $display("[DEBUG] Read ADDR: block(%d,%d) row %d addr=%h", 
-                                 block_row, block_col, read_row, read_addr);
-                    end
-                end
-                
-                S_READ_DATA: begin
-                    if (r_handshake) begin
-                        // Store data in 4x4 buffer
-                        src_buffer_4x4[read_row * 4 + (3 - read_burst_cnt)] <= rdata_i;
-                        read_burst_cnt <= read_burst_cnt - 1;
-                        
-                        $display("[DEBUG] Read DATA: buffer[%d] = %d", 
-                                 read_row * 4 + (3 - read_burst_cnt), rdata_i);
-                        
-                        if (burst_complete) begin
-                            read_row <= read_row + 1;
+                        if (r_handshake) begin
+                            src_row_buffer[read_cnt] <= rdata_i;
+                            read_cnt <= read_cnt + 1;
                             
-                            if (read_row == 2'd3) begin
-                                // All 4 rows read, apply padding
-                                $display("[DEBUG] All 4x4 data read, applying padding");
-                                state <= S_APPLY_PADDING;
-                            end else begin
-                                // Read next row
-                                read_addr <= src_addr + ((block_row + read_row + 1) * mat_width + block_col) * 4;
-                                state <= S_READ_ADDR;
+                            $display("[DEBUG] Read DATA: buffer[%d] = %d", read_cnt, rdata_i);
+                            
+                            if (read_complete) begin
+                                state <= S_WRITE_ROW;
+                                write_cnt <= 6'd0;
+                                write_addr <= calc_dst_addr(current_row, mat_width);
+                                write_data <= get_padded_value(current_row, 6'd0, mat_width);
                             end
                         end
-                    end
-                end
-                
-                S_APPLY_PADDING: begin
-                    // Apply mirror padding to create 5x5 buffer
-                    apply_mirror_padding();
-                    
-                    $display("[DEBUG] Padding applied for block(%d,%d)", block_row, block_col);
-                    
-                    // Initialize write state
-                    write_row <= 2'd0;
-                    write_addr <= calc_output_addr(block_row, block_col, mat_width);
-                    
-                    state <= S_WRITE_ADDR;
-                end
-                
-                S_WRITE_ADDR: begin
-                    if (aw_handshake) begin
-                        state <= S_WRITE_DATA;
-                        write_burst_cnt <= 4'd3; // 4 beats: 3, 2, 1, 0
-                        
-                        $display("[DEBUG] Write ADDR: row %d addr=%h", write_row, write_addr);
-                    end
-                end
-                
-                S_WRITE_DATA: begin
-                    if (w_handshake) begin
-                        write_burst_cnt <= write_burst_cnt - 1;
-                        
-                        $display("[DEBUG] Write DATA: data=%d", wdata_o);
-                        
-                        if (write_burst_done) begin
-                            if (b_handshake) begin
-                                write_row <= write_row + 1;
-                                
-                                if (write_row == 2'd3) begin
-                                    // All 4 rows written
-                                    state <= S_NEXT_BLOCK;
-                                end else begin
-                                    // Write next row
-                                    write_addr <= calc_output_addr(block_row + write_row + 1, block_col, mat_width);
-                                    state <= S_WRITE_ADDR;
-                                end
-                            end else begin
-                                state <= S_WRITE_RESP;
-                            end
-                        end
-                    end
-                end
-                
-                S_WRITE_RESP: begin
-                    if (b_handshake) begin
-                        write_row <= write_row + 1;
-                        
-                        if (write_row == 2'd3) begin
-                            // All 4 rows written
-                            state <= S_NEXT_BLOCK;
-                        end else begin
-                            // Write next row
-                            write_addr <= calc_output_addr(block_row + write_row + 1, block_col, mat_width);
-                            state <= S_WRITE_ADDR;
-                        end
-                    end
-                end
-                
-                S_NEXT_BLOCK: begin
-                    // Move to next 4x4 block
-                    if (block_col + 4 < mat_width) begin
-                        block_col <= block_col + 4;
-                        read_addr <= src_addr + (block_row * mat_width + block_col + 4) * 4;
-                        $display("[DEBUG] Moving to next column: block(%d,%d)", block_row, block_col + 4);
                     end else begin
-                        block_col <= 6'd0;
-                        block_row <= block_row + 4;
-                        read_addr <= src_addr + ((block_row + 4) * mat_width + 6'd0) * 4;
-                        $display("[DEBUG] Moving to next row: block(%d,0)", block_row + 4);
+                        // For boundary rows, no read needed, directly write
+                        state <= S_WRITE_ROW;
+                        write_cnt <= 6'd0;
+                        write_addr <= calc_dst_addr(current_row, mat_width);
+                        write_data <= get_padded_value(current_row, 6'd0, mat_width);
+                    end
+                end
+                
+                S_WRITE_ROW: begin
+                    if (aw_handshake) begin
+                        $display("[DEBUG] Write ROW: output_row=%d, addr=%h", current_row, write_addr);
                     end
                     
-                    if (block_row + 4 >= mat_width) begin
-                        $display("[DEBUG] All blocks completed! Going to IDLE");
+                    if (w_handshake) begin
+                        $display("[DEBUG] Write DATA: col=%d, data=%d", write_cnt, write_data);
+                        
+                        write_cnt <= write_cnt + 1;
+                        
+                        if (!is_last_write) begin
+                            write_data <= get_padded_value(current_row, write_cnt + 1, mat_width);
+                        end
+                        
+                        if (write_complete && b_handshake) begin
+                            state <= S_NEXT_ROW;
+                        end
+                    end
+                end
+                
+                S_NEXT_ROW: begin
+                    current_row <= current_row + 1;
+                    
+                    if (current_row >= mat_width + 1) begin
+                        // All rows processed
+                        $display("[DEBUG] All rows completed! Going to IDLE");
                         state <= S_IDLE;
                         done <= 1'b1;
                     end else begin
-                        $display("[DEBUG] Starting next block read");
-                        read_row <= 2'd0;
-                        state <= S_READ_ADDR;
+                        // Process next row
+                        read_cnt <= 6'd0;
+                        
+                        if (current_row + 1 < mat_width) begin
+                            // Read next source row
+                            read_addr <= calc_src_addr(current_row + 1, mat_width);
+                        end
+                        
+                        $display("[DEBUG] Moving to next row: %d", current_row + 1);
+                        state <= S_READ_ROW;
                     end
                 end
             endcase
