@@ -1,3 +1,4 @@
+DMA start
 [DEBUG] Starting DMA: src=00000000, dst=00000a00, width= 8
 [DEBUG] Blocks:  2x 2
 [DEBUG] Read REQ: block( 0, 0), type=TL, row=0, addr=00000000
@@ -49,18 +50,23 @@
 [DEBUG] Read DATA[3,3] =        607 -> buffer[4][4]
 [DEBUG] Storing rdata=       607 at buffer[4][4]
 [DEBUG] Processing block type  0, output_len=25
+[DEBUG] Setting write_len=25, awlen will be         24
 [DEBUG] Processing block type  0, output_len=25
+[DEBUG] Setting write_len=25, awlen will be         24
 [DEBUG] Processing block type  0, output_len=25
+[DEBUG] Setting write_len=25, awlen will be         24
+[DEBUG] TL padding: corner buffer[0][0]=       443 from buffer[2][2]
 [DEBUG] Write REQ: block( 0, 0), type=TL, len= 8, addr=00000a00
-[DEBUG] Write DATA[ 0] =       2017
-[DEBUG] Write DATA[ 1] =        587
-[DEBUG] Write DATA[ 2] =        443
-[DEBUG] Write DATA[ 3] =       2433
-[DEBUG] Write DATA[ 4] =       2226
-[DEBUG] Write DATA[ 5] =        205
-[DEBUG] Write DATA[ 6] =        633
-[DEBUG] Write DATA[ 7] =        205
-[DEBUG] Write DATA[ 8] =       3218
+[DEBUG] write_len=25, awlen_o= 8, burst_cnt_n= 8
+[DEBUG] Write DATA[ 0] =       2017 (from buffer[         0][         0])
+[DEBUG] Write DATA[ 1] =        587 (from buffer[         1][         0])
+[DEBUG] Write DATA[ 2] =        443 (from buffer[         2][         0])
+[DEBUG] Write DATA[ 3] =       2433 (from buffer[         3][         0])
+[DEBUG] Write DATA[ 4] =       2226 (from buffer[         4][         0])
+[DEBUG] Write DATA[ 5] =        205 (from buffer[         0][         1])
+[DEBUG] Write DATA[ 6] =        633 (from buffer[         1][         1])
+[DEBUG] Write DATA[ 7] =        205 (from buffer[         2][         1])
+[DEBUG] Write DATA[ 8] =       3218 (from buffer[         3][         1])
 [DEBUG] Block ( 0, 0) type=TL completed, moving to ( 1, 0)
 [DEBUG] Read REQ: block( 1, 0), type=TR, row=0, addr=00000010
 [DEBUG] Read DATA[0,0] =       2729 -> buffer[0][1]
@@ -111,18 +117,22 @@
 [DEBUG] Read DATA[3,3] =        251 -> buffer[3][4]
 [DEBUG] Storing rdata=       251 at buffer[3][4]
 [DEBUG] Processing block type  1, output_len=25
+[DEBUG] Setting write_len=25, awlen will be         24
 [DEBUG] Processing block type  1, output_len=25
+[DEBUG] Setting write_len=25, awlen will be         24
 [DEBUG] Processing block type  1, output_len=25
+[DEBUG] Setting write_len=25, awlen will be         24
 [DEBUG] Write REQ: block( 1, 0), type=TR, len= 8, addr=00000a10
-[DEBUG] Write DATA[ 0] =        443
-[DEBUG] Write DATA[ 1] =       2315
-[DEBUG] Write DATA[ 2] =        328
-[DEBUG] Write DATA[ 3] =        225
-[DEBUG] Write DATA[ 4] =        328
-[DEBUG] Write DATA[ 5] =       2729
-[DEBUG] Write DATA[ 6] =       3230
-[DEBUG] Write DATA[ 7] =       3037
-[DEBUG] Write DATA[ 8] =       3520
+[DEBUG] write_len=25, awlen_o= 8, burst_cnt_n= 8
+[DEBUG] Write DATA[ 0] =        443 (from buffer[         0][         0])
+[DEBUG] Write DATA[ 1] =       2315 (from buffer[         1][         0])
+[DEBUG] Write DATA[ 2] =        328 (from buffer[         2][         0])
+[DEBUG] Write DATA[ 3] =        225 (from buffer[         3][         0])
+[DEBUG] Write DATA[ 4] =        328 (from buffer[         4][         0])
+[DEBUG] Write DATA[ 5] =       2729 (from buffer[         0][         1])
+[DEBUG] Write DATA[ 6] =       3230 (from buffer[         1][         1])
+[DEBUG] Write DATA[ 7] =       3037 (from buffer[         2][         1])
+[DEBUG] Write DATA[ 8] =       3520 (from buffer[         3][         1])
 [DEBUG] Block ( 1, 0) type=TR completed, moving to ( 0, 1)
 [DEBUG] Read REQ: block( 0, 1), type=BL, row=0, addr=00000080
 [DEBUG] Read DATA[0,0] =        281 -> buffer[1][0]
@@ -173,18 +183,22 @@
 [DEBUG] Read DATA[3,3] =       3543 -> buffer[4][3]
 [DEBUG] Storing rdata=      3543 at buffer[4][3]
 [DEBUG] Processing block type  2, output_len=25
+[DEBUG] Setting write_len=25, awlen will be         24
 [DEBUG] Processing block type  2, output_len=25
+[DEBUG] Setting write_len=25, awlen will be         24
 [DEBUG] Processing block type  2, output_len=25
+[DEBUG] Setting write_len=25, awlen will be         24
 [DEBUG] Write REQ: block( 0, 1), type=BL, len= 8, addr=00000aa0
-[DEBUG] Write DATA[ 0] =       1971
-[DEBUG] Write DATA[ 1] =        281
-[DEBUG] Write DATA[ 2] =       1190
-[DEBUG] Write DATA[ 3] =       2899
-[DEBUG] Write DATA[ 4] =       1775
-[DEBUG] Write DATA[ 5] =       3944
-[DEBUG] Write DATA[ 6] =       3574
-[DEBUG] Write DATA[ 7] =       3944
-[DEBUG] Write DATA[ 8] =         20
+[DEBUG] write_len=25, awlen_o= 8, burst_cnt_n= 8
+[DEBUG] Write DATA[ 0] =       1971 (from buffer[         0][         0])
+[DEBUG] Write DATA[ 1] =        281 (from buffer[         1][         0])
+[DEBUG] Write DATA[ 2] =       1190 (from buffer[         2][         0])
+[DEBUG] Write DATA[ 3] =       2899 (from buffer[         3][         0])
+[DEBUG] Write DATA[ 4] =       1775 (from buffer[         4][         0])
+[DEBUG] Write DATA[ 5] =       3944 (from buffer[         0][         1])
+[DEBUG] Write DATA[ 6] =       3574 (from buffer[         1][         1])
+[DEBUG] Write DATA[ 7] =       3944 (from buffer[         2][         1])
+[DEBUG] Write DATA[ 8] =         20 (from buffer[         3][         1])
 [DEBUG] Block ( 0, 1) type=BL completed, moving to ( 1, 1)
 [DEBUG] Read REQ: block( 1, 1), type=BR, row=0, addr=00000090
 [DEBUG] Read DATA[0,0] =       3821 -> buffer[0][0]
@@ -235,16 +249,20 @@
 [DEBUG] Read DATA[3,3] =       2378 -> buffer[3][3]
 [DEBUG] Storing rdata=      2378 at buffer[3][3]
 [DEBUG] Processing block type  3, output_len=25
+[DEBUG] Setting write_len=25, awlen will be         24
 [DEBUG] Processing block type  3, output_len=25
+[DEBUG] Setting write_len=25, awlen will be         24
 [DEBUG] Processing block type  3, output_len=25
+[DEBUG] Setting write_len=25, awlen will be         24
 [DEBUG] Write REQ: block( 1, 1), type=BR, len= 8, addr=00000ab0
-[DEBUG] Write DATA[ 0] =       3821
-[DEBUG] Write DATA[ 1] =       3505
-[DEBUG] Write DATA[ 2] =       3684
-[DEBUG] Write DATA[ 3] =         33
-[DEBUG] Write DATA[ 4] =       3684
-[DEBUG] Write DATA[ 5] =       1578
-[DEBUG] Write DATA[ 6] =       1854
-[DEBUG] Write DATA[ 7] =       3831
-[DEBUG] Write DATA[ 8] =       3910
+[DEBUG] write_len=25, awlen_o= 8, burst_cnt_n= 8
+[DEBUG] Write DATA[ 0] =       3821 (from buffer[         0][         0])
+[DEBUG] Write DATA[ 1] =       3505 (from buffer[         1][         0])
+[DEBUG] Write DATA[ 2] =       3684 (from buffer[         2][         0])
+[DEBUG] Write DATA[ 3] =         33 (from buffer[         3][         0])
+[DEBUG] Write DATA[ 4] =       3684 (from buffer[         4][         0])
+[DEBUG] Write DATA[ 5] =       1578 (from buffer[         0][         1])
+[DEBUG] Write DATA[ 6] =       1854 (from buffer[         1][         1])
+[DEBUG] Write DATA[ 7] =       3831 (from buffer[         2][         1])
+[DEBUG] Write DATA[ 8] =       3910 (from buffer[         3][         1])
 [DEBUG] All blocks completed!

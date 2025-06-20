@@ -89,6 +89,7 @@ module MPDMAC_ENGINE
     reg [4:0]                   write_cnt, write_cnt_n; // 출력 중인 데이터 개수 (최대 25개)
     reg [4:0]                   write_len, write_len_n; // 현재 블록의 출력 길이
     reg [4:0]                   burst_cnt, burst_cnt_n; // SGDMAC 패턴: burst counter
+    reg [2:0]                   write_row, write_row_n; // 현재 쓰고 있는 행 (0~4)
     
     // Block type detection
     reg [3:0]               block_type, block_type_n;
@@ -191,9 +192,10 @@ module MPDMAC_ENGINE
         end
     endfunction
     
-    // Calculate destination write address - buffer의 (0,0)부터 시작 주소
+    // Calculate destination write address - 현재 행의 시작 주소
     function [31:0] calc_write_addr;
         input [5:0] bx, by;
+        input [2:0] wrow;    // 현재 쓰고 있는 행 (0~4)
         input [5:0] width;
         input [31:0] base_addr;
         input [3:0] btype;
@@ -202,19 +204,19 @@ module MPDMAC_ENGINE
             // 패딩된 매트릭스에서의 시작 위치 계산
             case (btype)
                 TYPE_TL, TYPE_TR, TYPE_BL, TYPE_BR: begin
-                    dst_row = by * 4;
+                    dst_row = by * 4 + wrow;
                     dst_col = bx * 4;
                 end
                 TYPE_T, TYPE_B: begin
-                    dst_row = by * 4;
+                    dst_row = by * 4 + wrow;
                     dst_col = bx * 4 + 1;
                 end
                 TYPE_L, TYPE_R: begin
-                    dst_row = by * 4 + 1;
+                    dst_row = by * 4 + 1 + wrow;
                     dst_col = bx * 4;
                 end
                 TYPE_INNER: begin
-                    dst_row = by * 4 + 1;
+                    dst_row = by * 4 + 1 + wrow;
                     dst_col = bx * 4 + 1;
                 end
             endcase
@@ -258,49 +260,45 @@ module MPDMAC_ENGINE
         end
     endfunction
     
-    // Get output length for each block type
-    function [4:0] get_output_len;
+    // Get total rows for each block type
+    function [2:0] get_total_rows;
         input [3:0] btype;
         begin
             case (btype)
-                TYPE_TL, TYPE_TR, TYPE_BL, TYPE_BR: get_output_len = 5'd25;  // 5x5
-                TYPE_T, TYPE_B: get_output_len = 5'd20;                      // 5x4
-                TYPE_L, TYPE_R: get_output_len = 5'd20;                      // 4x5
-                TYPE_INNER: get_output_len = 5'd16;                          // 4x4
-                default: get_output_len = 5'd16;
+                TYPE_TL, TYPE_TR, TYPE_BL, TYPE_BR: get_total_rows = 3'd5;  // 5 rows
+                TYPE_T, TYPE_B: get_total_rows = 3'd4;                      // 4 rows  
+                TYPE_L, TYPE_R: get_total_rows = 3'd5;                      // 5 rows
+                TYPE_INNER: get_total_rows = 3'd4;                          // 4 rows
+                default: get_total_rows = 3'd4;
             endcase
         end
     endfunction
     
-    // Get output data from buffer based on write counter
+    // Get row length for each block type and row
+    function [2:0] get_row_len;
+        input [3:0] btype;
+        input [2:0] row;
+        begin
+            case (btype)
+                TYPE_TL, TYPE_TR, TYPE_BL, TYPE_BR: get_row_len = 3'd5;     // 5 per row
+                TYPE_T, TYPE_B: get_row_len = 3'd5;                         // 5 per row
+                TYPE_L, TYPE_R: get_row_len = 3'd4;                         // 4 per row  
+                TYPE_INNER: get_row_len = 3'd4;                             // 4 per row
+                default: get_row_len = 3'd4;
+            endcase
+        end
+    endfunction
+    
+    // Get output data from buffer based on write counter and row
     function [31:0] get_output_data;
-        input [4:0] cnt;
+        input [2:0] cnt;     // 현재 행 내 인덱스 (0~4)
+        input [2:0] row;     // 현재 행 (0~4)
         input [3:0] btype;
         reg [2:0] buf_x, buf_y;
-        reg [2:0] out_width, out_height;
         begin
-            // 출력 크기 결정
-            case (btype)
-                TYPE_TL, TYPE_TR, TYPE_BL, TYPE_BR: begin
-                    out_width = 5; out_height = 5;
-                end
-                TYPE_T, TYPE_B: begin
-                    out_width = 5; out_height = 4;
-                end
-                TYPE_L, TYPE_R: begin
-                    out_width = 4; out_height = 5;
-                end
-                TYPE_INNER: begin
-                    out_width = 4; out_height = 4;
-                end
-                default: begin
-                    out_width = 4; out_height = 4;
-                end
-            endcase
-            
-            // buffer[0][0]부터 row-major order로 출력
-            buf_y = cnt / out_width;
-            buf_x = cnt % out_width;
+            // 현재 행의 cnt번째 데이터 반환
+            buf_y = row;
+            buf_x = cnt;
             get_output_data = buffer[buf_x][buf_y];
         end
     endfunction
@@ -321,6 +319,7 @@ module MPDMAC_ENGINE
             write_cnt <= 5'd0;
             write_len <= 5'd0;
             burst_cnt <= 5'd0;
+            write_row <= 3'd0;
             block_type <= 4'd0;
             done <= 1'b1;
         end else begin
@@ -337,6 +336,7 @@ module MPDMAC_ENGINE
             write_cnt <= write_cnt_n;
             write_len <= write_len_n;
             burst_cnt <= burst_cnt_n;
+            write_row <= write_row_n;
             block_type <= block_type_n;
             done <= done_n;
         end
@@ -357,6 +357,7 @@ module MPDMAC_ENGINE
         write_cnt_n = write_cnt;
         write_len_n = write_len;
         burst_cnt_n = burst_cnt;
+        write_row_n = write_row;
         block_type_n = block_type;
         done_n = done;
         
@@ -426,12 +427,13 @@ module MPDMAC_ENGINE
             
             S_PROCESS: begin
                 // Apply padding based on block type - 한 번만 실행
-                write_cnt_n = 5'd0;
-                write_len_n = get_output_len(block_type);
+                write_cnt_n = 3'd0;
+                write_row_n = 3'd0; 
+                write_len_n = get_row_len(block_type, 3'd0); // 첫 번째 행 길이
                 state_n = S_WREQ;
                 
-                $display("[DEBUG] Processing block type %d, output_len=%d", block_type, get_output_len(block_type));
-                $display("[DEBUG] Setting write_len=%d, awlen will be %d", get_output_len(block_type), get_output_len(block_type) - 1);
+                $display("[DEBUG] Processing block type %d, total_rows=%d", block_type, get_total_rows(block_type));
+                $display("[DEBUG] Starting row 0, len=%d, awlen will be %d", get_row_len(block_type, 3'd0), get_row_len(block_type, 3'd0) - 1);
             end
             
             S_WREQ: begin
@@ -440,8 +442,8 @@ module MPDMAC_ENGINE
                     state_n = S_WDATA;
                     burst_cnt_n = awlen_o;  // RTL_new 패턴: awlen_o 값으로 초기화
                     
-                    $display("[DEBUG] Write REQ: block(%d,%d), type=%s, len=%d, addr=%h", 
-                            block_x, block_y, get_block_type_name(block_type), awlen_o, awaddr_o);
+                    $display("[DEBUG] Write REQ: block(%d,%d), type=%s, row=%d, len=%d, addr=%h", 
+                            block_x, block_y, get_block_type_name(block_type), write_row, awlen_o, awaddr_o);
                     $display("[DEBUG] write_len=%d, awlen_o=%d, burst_cnt_n=%d", 
                             write_len, awlen_o, awlen_o);
                 end
@@ -454,30 +456,40 @@ module MPDMAC_ENGINE
                     burst_cnt_n = burst_cnt - 1;  // SGDMAC 패턴: burst counter 감소
                     
                     $display("[DEBUG] Write DATA[%d] = %d (from buffer[%d][%d])", 
-                            write_cnt, wdata_o, write_cnt % 5, write_cnt / 5);
+                            write_cnt, wdata_o, write_cnt, write_row);
                     
                     if (is_last_beat) begin
                         // RTL_new 패턴: wlast와 동시에 response 처리
-                    if (b_handshake) begin
+                        if (b_handshake) begin
                             // Same cycle: write complete + response received
-                            if (all_blocks_done) begin
-                                state_n = S_IDLE;
-                                done_n = 1'b1;
-                                $display("[DEBUG] All blocks completed!");
+                            if (write_row == get_total_rows(block_type) - 1) begin
+                                // 현재 블록의 모든 행 완료
+                                if (all_blocks_done) begin
+                                    state_n = S_IDLE;
+                                    done_n = 1'b1;
+                                    $display("[DEBUG] All blocks completed!");
+                                end else begin
+                                    // Move to next block immediately (row-major order)
+                                    if (block_x == blocks_per_row - 1) begin
+                                        block_x_n = 6'd0;
+                                        block_y_n = block_y + 1;
+                                    end else begin
+                                        block_x_n = block_x + 1;
+                                        block_y_n = block_y;
+                                    end
+                                    read_row_n = 2'd0;
+                                    block_type_n = detect_block_type(block_x_n, block_y_n, blocks_per_row, blocks_per_col);
+                                    state_n = S_RREQ;
+                                    $display("[DEBUG] Block (%d,%d) type=%s completed, moving to (%d,%d)", 
+                                            block_x, block_y, get_block_type_name(block_type), block_x_n, block_y_n);
+                                end
                             end else begin
-                                                                // Move to next block immediately (row-major order)
-                                 if (block_x == blocks_per_row - 1) begin
-                                     block_x_n = 6'd0;
-                                     block_y_n = block_y + 1;
-                                 end else begin
-                                     block_x_n = block_x + 1;
-                                     block_y_n = block_y;
-                                 end
-                                read_row_n = 2'd0;
-                                block_type_n = detect_block_type(block_x_n, block_y_n, blocks_per_row, blocks_per_col);
-                                state_n = S_RREQ;
-                                $display("[DEBUG] Block (%d,%d) type=%s completed, moving to (%d,%d)", 
-                                        block_x, block_y, get_block_type_name(block_type), block_x_n, block_y_n);
+                                // 다음 행으로 이동
+                                write_row_n = write_row + 1;
+                                write_cnt_n = 3'd0;
+                                write_len_n = get_row_len(block_type, write_row + 1);
+                                state_n = S_WREQ;
+                                $display("[DEBUG] Row %d completed, moving to row %d", write_row, write_row + 1);
                             end
                         end else begin
                             // Wait for response in next state
@@ -490,26 +502,36 @@ module MPDMAC_ENGINE
             S_WRESP: begin
                 // SGDMAC 패턴: response 대기 상태
                 if (b_handshake) begin
-                    state_n = all_blocks_done ? S_IDLE : S_RREQ;
-                    
-                                        if (!all_blocks_done) begin
-                        // Move to next block (row-major order)
-                        if (block_x == blocks_per_row - 1) begin
-                            block_x_n = 6'd0;
-                            block_y_n = block_y + 1;
+                    if (write_row == get_total_rows(block_type) - 1) begin
+                        // 현재 블록의 모든 행 완료
+                        if (all_blocks_done) begin
+                            state_n = S_IDLE;
+                            done_n = 1'b1;
+                            $display("[DEBUG] All blocks completed!");
                         end else begin
-                            block_x_n = block_x + 1;
-                            block_y_n = block_y;
+                            // Move to next block (row-major order)
+                            if (block_x == blocks_per_row - 1) begin
+                                block_x_n = 6'd0;
+                                block_y_n = block_y + 1;
+                            end else begin
+                                block_x_n = block_x + 1;
+                                block_y_n = block_y;
+                            end
+                            
+                            read_row_n = 2'd0;
+                            block_type_n = detect_block_type(block_x_n, block_y_n, blocks_per_row, blocks_per_col);
+                            state_n = S_RREQ;
+                            
+                            $display("[DEBUG] Block (%d,%d) type=%s completed, moving to (%d,%d)", 
+                                    block_x, block_y, get_block_type_name(block_type), block_x_n, block_y_n);
                         end
-                        
-                        read_row_n = 2'd0;
-                        block_type_n = detect_block_type(block_x_n, block_y_n, blocks_per_row, blocks_per_col);
-                        
-                        $display("[DEBUG] Block (%d,%d) type=%s completed, moving to (%d,%d)", 
-                                block_x, block_y, get_block_type_name(block_type), block_x_n, block_y_n);
                     end else begin
-                        done_n = 1'b1;
-                        $display("[DEBUG] All blocks completed!");
+                        // 다음 행으로 이동
+                        write_row_n = write_row + 1;
+                        write_cnt_n = 3'd0;
+                        write_len_n = get_row_len(block_type, write_row + 1);
+                        state_n = S_WREQ;
+                        $display("[DEBUG] Row %d completed, moving to row %d", write_row, write_row + 1);
                     end
                 end
             end
@@ -590,14 +612,14 @@ module MPDMAC_ENGINE
     assign done_o = done;
 
     assign awid_o = 4'd0;
-    assign awaddr_o = calc_write_addr(block_x, block_y, mat_width, dst_addr, block_type);
+    assign awaddr_o = calc_write_addr(block_x, block_y, write_row, mat_width, dst_addr, block_type);
     assign awlen_o = write_len - 1;   // burst length (0-based)
     assign awsize_o = 3'b010;         // 4 bytes per transfer
     assign awburst_o = 2'b01;         // incremental
     assign awvalid_o = awvalid;
 
     assign wid_o = 4'd0;
-    assign wdata_o = get_output_data(write_cnt, block_type);
+    assign wdata_o = get_output_data(write_cnt, write_row, block_type);
     assign wstrb_o = 4'b1111;         // all bytes valid
     assign wlast_o = (state == S_WDATA) & is_last_beat;  // SGDMAC 패턴
     assign wvalid_o = wvalid;
