@@ -653,7 +653,7 @@ module MPDMAC_ENGINE
     assign awvalid_o = awvalid;
 
     assign wid_o = 4'd0;
-    assign wdata_o = get_output_data(write_cnt, write_row, block_type);
+    assign wdata_o = get_output_data(write_len - burst_cnt - 1, write_row, block_type);
     assign wstrb_o = 4'b1111;         // all bytes valid
     assign wlast_o = (state == S_WDATA) & is_last_beat;  // SGDMAC 패턴
     assign wvalid_o = wvalid;
