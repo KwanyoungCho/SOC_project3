@@ -148,23 +148,6 @@ module MPDMAC_ENGINE
         end
     endfunction
     
-    // State name for debug
-    function string get_state_name;
-        input [2:0] st;
-        begin
-            case (st)
-                S_IDLE: get_state_name = "S_IDLE";
-                S_RREQ: get_state_name = "S_RREQ";
-                S_RDATA: get_state_name = "S_RDATA";
-                S_PROCESS: get_state_name = "S_PROCESS";
-                S_WREQ: get_state_name = "S_WREQ";
-                S_WDATA: get_state_name = "S_WDATA";
-                S_WRESP: get_state_name = "S_WRESP";
-                default: get_state_name = "UNKNOWN";
-            endcase
-        end
-    endfunction
-    
     // Block type detection function
     function [3:0] detect_block_type;
         input [5:0] bx, by;
@@ -208,7 +191,7 @@ module MPDMAC_ENGINE
         end
     endfunction
     
-    // Calculate destination write address
+    // Calculate destination write address - buffer의 (0,0)부터 시작 주소
     function [31:0] calc_write_addr;
         input [5:0] bx, by;
         input [5:0] width;
@@ -216,6 +199,7 @@ module MPDMAC_ENGINE
         input [3:0] btype;
         reg [5:0] dst_row, dst_col;
         begin
+            // 패딩된 매트릭스에서의 시작 위치 계산
             case (btype)
                 TYPE_TL, TYPE_TR, TYPE_BL, TYPE_BR: begin
                     dst_row = by * 4;
@@ -234,6 +218,7 @@ module MPDMAC_ENGINE
                     dst_col = bx * 4 + 1;
                 end
             endcase
+            // 패딩된 매트릭스 크기는 (width + 2) x (width + 2)
             calc_write_addr = base_addr + (dst_row * (width + 2) + dst_col) * 4;
         end
     endfunction
@@ -292,37 +277,34 @@ module MPDMAC_ENGINE
         input [4:0] cnt;
         input [3:0] btype;
         reg [2:0] buf_x, buf_y;
+        reg [2:0] out_width, out_height;
         begin
+            // 출력 크기 결정
             case (btype)
                 TYPE_TL, TYPE_TR, TYPE_BL, TYPE_BR: begin
-                    // 5x5 전체 출력 (row-major order)
-                    buf_y = cnt / 5;
-                    buf_x = cnt % 5;
+                    out_width = 5; out_height = 5;
                 end
                 TYPE_T, TYPE_B: begin
-                    // 5x4 출력
-                    buf_y = cnt / 5;
-                    buf_x = cnt % 5;
+                    out_width = 5; out_height = 4;
                 end
                 TYPE_L, TYPE_R: begin
-                    // 4x5 출력
-                    buf_y = cnt / 4;
-                    buf_x = cnt % 4;
+                    out_width = 4; out_height = 5;
                 end
                 TYPE_INNER: begin
-                    // 4x4 출력 (패딩 제외)
-                    buf_y = cnt / 4 + 1;
-                    buf_x = cnt % 4 + 1;
+                    out_width = 4; out_height = 4;
                 end
                 default: begin
-                    buf_x = 0;
-                    buf_y = 0;
+                    out_width = 4; out_height = 4;
                 end
             endcase
+            
+            // buffer[0][0]부터 row-major order로 출력
+            buf_y = cnt / out_width;
+            buf_x = cnt % out_width;
             get_output_data = buffer[buf_x][buf_y];
         end
     endfunction
-
+    
     // Sequential logic
     always_ff @(posedge clk) begin
         if (!rst_n) begin
@@ -342,10 +324,6 @@ module MPDMAC_ENGINE
             block_type <= 4'd0;
             done <= 1'b1;
         end else begin
-            if (state != state_n) begin
-                $display("[DEBUG] State transition: %s -> %s for block(%d,%d)", 
-                        get_state_name(state), get_state_name(state_n), block_x, block_y);
-            end
             state <= state_n;
             src_addr <= src_addr_n;
             dst_addr <= dst_addr_n;
@@ -387,8 +365,8 @@ module MPDMAC_ENGINE
         awvalid = 1'b0;
         wvalid = 1'b0;
 
-        case (state)
-            S_IDLE: begin
+            case (state)
+                S_IDLE: begin
                 done_n = 1'b1;
                 if (start_i && mat_width_i != 0) begin
                     done_n = 1'b0;
@@ -436,7 +414,6 @@ module MPDMAC_ENGINE
                         read_col_n = 2'd0;  // Reset column for next row
                         if (read_4x4_complete) begin
                             // All 4 rows read, process padding
-                            $display("[DEBUG] 4x4 read complete for block(%d,%d), moving to S_PROCESS", block_x, block_y);
                             state_n = S_PROCESS;
                         end else begin
                             // Read next row
@@ -453,11 +430,8 @@ module MPDMAC_ENGINE
                 write_len_n = get_output_len(block_type);
                 state_n = S_WREQ;
                 
-                $display("[DEBUG] BEFORE Processing: current block=(%d,%d), type=%s", 
-                        block_x, block_y, get_block_type_name(block_type));
                 $display("[DEBUG] Processing block type %d, output_len=%d", block_type, get_output_len(block_type));
-                $display("[DEBUG] AFTER Processing: current block=(%d,%d), type=%s, next_state=S_WREQ", 
-                        block_x, block_y, get_block_type_name(block_type));
+                $display("[DEBUG] Setting write_len=%d, awlen will be %d", get_output_len(block_type), get_output_len(block_type) - 1);
             end
             
             S_WREQ: begin
@@ -468,6 +442,8 @@ module MPDMAC_ENGINE
                     
                     $display("[DEBUG] Write REQ: block(%d,%d), type=%s, len=%d, addr=%h", 
                             block_x, block_y, get_block_type_name(block_type), awlen_o, awaddr_o);
+                    $display("[DEBUG] write_len=%d, awlen_o=%d, burst_cnt_n=%d", 
+                            write_len, awlen_o, awlen_o);
                 end
             end
             
@@ -477,11 +453,12 @@ module MPDMAC_ENGINE
                     write_cnt_n = write_cnt + 1;
                     burst_cnt_n = burst_cnt - 1;  // SGDMAC 패턴: burst counter 감소
                     
-                    $display("[DEBUG] Write DATA[%d] = %d", write_cnt, wdata_o);
+                    $display("[DEBUG] Write DATA[%d] = %d (from buffer[%d][%d])", 
+                            write_cnt, wdata_o, write_cnt % 5, write_cnt / 5);
                     
                     if (is_last_beat) begin
                         // RTL_new 패턴: wlast와 동시에 response 처리
-                        if (b_handshake) begin
+                    if (b_handshake) begin
                             // Same cycle: write complete + response received
                             if (all_blocks_done) begin
                                 state_n = S_IDLE;
@@ -507,9 +484,9 @@ module MPDMAC_ENGINE
                             state_n = S_WRESP;
                         end
                     end
+                    end
                 end
-            end
-            
+                
             S_WRESP: begin
                 // SGDMAC 패턴: response 대기 상태
                 if (b_handshake) begin
@@ -559,14 +536,13 @@ module MPDMAC_ENGINE
             
             // Apply padding in S_PROCESS state
             if (state == S_PROCESS) begin
-                $display("[DEBUG] Applying padding for block(%d,%d), type=%s in always_ff", 
-                        block_x, block_y, get_block_type_name(block_type));
                 case (block_type)
                     TYPE_TL: begin
                         // TL: (1,1) 기준으로 4x4 저장됨, padding 적용
                         buffer[0][0] <= buffer[2][2];  // corner = 첫 번째 데이터
                         for (i = 1; i < 5; i = i + 1) buffer[i][0] <= buffer[i][2];  // top row
                         for (j = 1; j < 5; j = j + 1) buffer[0][j] <= buffer[2][j];  // left col
+                        $display("[DEBUG] TL padding: corner buffer[0][0]=%d from buffer[2][2]", buffer[2][2]);
                     end
                     TYPE_TR: begin
                         // TR: (0,1) 기준으로 4x4 저장됨
