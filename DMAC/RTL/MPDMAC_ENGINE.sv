@@ -323,12 +323,9 @@ module MPDMAC_ENGINE
         input [2:0] cnt;     // 현재 행 내 인덱스 (0~4)
         input [2:0] row;     // 현재 행 (0~4)
         input [3:0] btype;
-        reg [2:0] buf_x, buf_y;
         begin
             // 현재 행의 cnt번째 데이터 반환
-            buf_y = row;
-            buf_x = cnt;
-            get_output_data = buffer[buf_x][buf_y];
+            get_output_data = buffer[cnt][row];
         end
     endfunction
     
@@ -557,25 +554,25 @@ module MPDMAC_ENGINE
                 case (block_type)
                     TYPE_TL: begin
                         // TL: (1,1) 기준으로 4x4 저장됨, padding 적용
-                        buffer[0][0] <= buffer[2][2];  // corner = 첫 번째 데이터
+                        buffer[0][0] <= buffer[2][2];  
                         for (i = 1; i < 5; i = i + 1) buffer[i][0] <= buffer[i][2];  // top row
                         for (j = 1; j < 5; j = j + 1) buffer[0][j] <= buffer[2][j];  // left col
                     end
                     TYPE_TR: begin
                         // TR: (0,1) 기준으로 4x4 저장됨
-                        buffer[4][0] <= buffer[2][2];  // corner = 마지막 첫행 데이터
+                        buffer[4][0] <= buffer[2][2];  
                         for (i = 0; i < 4; i = i + 1) buffer[i][0] <= buffer[i][2];  // top row
                         for (j = 1; j < 5; j = j + 1) buffer[4][j] <= buffer[2][j];  // right col
                     end
                     TYPE_BL: begin
                         // BL: (1,0) 기준으로 4x4 저장됨
-                        buffer[0][4] <= buffer[2][2];  // corner = 첫 마지막행 데이터
+                        buffer[0][4] <= buffer[2][2];  
                         for (i = 1; i < 5; i = i + 1) buffer[i][4] <= buffer[i][2];  // bottom row
                         for (j = 0; j < 4; j = j + 1) buffer[0][j] <= buffer[2][j];  // left col
                     end
                     TYPE_BR: begin
                         // BR: (0,0) 기준으로 4x4 저장됨
-                        buffer[4][4] <= buffer[2][2];  // corner = 마지막 마지막 데이터
+                        buffer[4][4] <= buffer[2][2]; 
                         for (i = 0; i < 4; i = i + 1) buffer[i][4] <= buffer[i][2];  // bottom row
                         for (j = 0; j < 4; j = j + 1) buffer[4][j] <= buffer[2][j];  // right col
                     end
@@ -596,7 +593,7 @@ module MPDMAC_ENGINE
                         for (j = 0; j < 4; j = j + 1) buffer[4][j] <= buffer[2][j];  // right col
                     end
                     TYPE_INNER: begin
-                        // INNER: (1,1) 기준으로 4x4 저장됨, padding 없음
+                        // INNER: (0,0) 기준으로 4x4 저장됨, padding 없음
                     end
                 endcase
             end
