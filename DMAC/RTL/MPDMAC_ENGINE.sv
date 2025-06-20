@@ -295,8 +295,8 @@ module MPDMAC_ENGINE
         begin
             case (btype)
                 TYPE_TL, TYPE_TR, TYPE_BL, TYPE_BR: get_total_rows = 3'd5;  // 5 rows
-                TYPE_T, TYPE_B: get_total_rows = 3'd4;                      // 4 rows  
-                TYPE_L, TYPE_R: get_total_rows = 3'd5;                      // 5 rows
+                TYPE_T, TYPE_B: get_total_rows = 3'd5;                      // 5 rows  
+                TYPE_L, TYPE_R: get_total_rows = 3'd4;                      // 4 rows
                 TYPE_INNER: get_total_rows = 3'd4;                          // 4 rows
                 default: get_total_rows = 3'd4;
             endcase
@@ -310,8 +310,8 @@ module MPDMAC_ENGINE
         begin
             case (btype)
                 TYPE_TL, TYPE_TR, TYPE_BL, TYPE_BR: get_row_len = 3'd5;     // 5 per row
-                TYPE_T, TYPE_B: get_row_len = 3'd5;                         // 5 per row
-                TYPE_L, TYPE_R: get_row_len = 3'd4;                         // 4 per row  
+                TYPE_T, TYPE_B: get_row_len = 3'd4;                         // 4 per row (no left/right padding)
+                TYPE_L, TYPE_R: get_row_len = 3'd5;                         // 5 per row  
                 TYPE_INNER: get_row_len = 3'd4;                             // 4 per row
                 default: get_row_len = 3'd4;
             endcase
