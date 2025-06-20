@@ -61,10 +61,9 @@ module MPDMAC_ENGINE
                                 S_RREQ      = 3'd1,
                                 S_RDATA     = 3'd2,
                                 S_PROCESS   = 3'd3,
-                                S_WAIT_PAD  = 3'd4,  // 패딩 완료 대기
-                                S_WREQ      = 3'd5,
-                                S_WDATA     = 3'd6,
-                                S_WRESP     = 3'd7;  // SGDMAC 패턴: response 대기 상태 추가
+                                S_WREQ      = 3'd4,
+                                S_WDATA     = 3'd5,
+                                S_WRESP     = 3'd6;  // SGDMAC 패턴: response 대기 상태 추가
 
     reg [2:0]                   state, state_n;
     
@@ -110,6 +109,7 @@ module MPDMAC_ENGINE
     reg                     awvalid;
     reg                     wvalid;
     reg                     done, done_n;
+    reg [31:0]              wdata_reg;
     
     // SGDMAC handshake patterns
     wire ar_handshake = arvalid_o & arready_i;
@@ -369,6 +369,11 @@ module MPDMAC_ENGINE
             write_row <= write_row_n;
             block_type <= block_type_n;
             done <= done_n;
+            
+            // Update wdata_reg when in WDATA state
+            if (state == S_WDATA || state_n == S_WDATA) begin
+                wdata_reg <= get_output_data(write_cnt, write_row, block_type);
+            end
         end
     end
 
@@ -460,18 +465,10 @@ module MPDMAC_ENGINE
                 write_cnt_n = 3'd0;
                 write_row_n = 3'd0; 
                 write_len_n = get_row_len(block_type, 3'd0); // 첫 번째 행 길이
-                state_n = S_WAIT_PAD;  // 패딩 완료를 위해 한 클럭 대기
+                state_n = S_WREQ;
                 
                 $display("[DEBUG] Processing block type %d, total_rows=%d", block_type, get_total_rows(block_type));
                 $display("[DEBUG] Starting row 0, len=%d, awlen will be %d", get_row_len(block_type, 3'd0), get_row_len(block_type, 3'd0) - 1);
-            end
-            
-            S_WAIT_PAD: begin
-                // 패딩이 always_ff에서 완료되었으므로 이제 쓰기 시작
-                state_n = S_WREQ;
-                $display("[DEBUG] Padding completed, moving to WREQ");
-                $display("[DEBUG] Padded buffer row 0: [0]=%d, [1]=%d, [2]=%d, [3]=%d, [4]=%d", 
-                        buffer[0][0], buffer[1][0], buffer[2][0], buffer[3][0], buffer[4][0]);
             end
             
             S_WREQ: begin
@@ -661,7 +658,7 @@ module MPDMAC_ENGINE
     assign awvalid_o = awvalid;
 
     assign wid_o = 4'd0;
-    assign wdata_o = get_output_data(write_cnt, write_row, block_type);
+    assign wdata_o = wdata_reg;
     assign wstrb_o = 4'b1111;         // all bytes valid
     assign wlast_o = (state == S_WDATA) & is_last_beat;  // SGDMAC 패턴
     assign wvalid_o = wvalid;
