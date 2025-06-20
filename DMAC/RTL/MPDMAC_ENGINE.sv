@@ -346,6 +346,7 @@ module MPDMAC_ENGINE
                         reg signed [6:0] row_r, base_c;
                         reg [31:0] read_addr_offset;
                         
+                        // read_count를 기반으로 현재 읽을 행 계산
                         row_r = center_row - 1 + (read_count / 3);
                         base_c = center_col - 1;
                         
@@ -356,12 +357,13 @@ module MPDMAC_ENGINE
                         
                         ar_valid <= 1'b1;
                         ar_addr <= src_addr + read_addr_offset;
-                        burst_count <= 4'd2; // 3 beats: 0, 1, 2
+                        burst_count <= 4'd2; // 3 beats: 2, 1, 0
                         
                         state <= S_READ_DATA;
                     end else if (read_count >= 9) begin
                         $display("[DEBUG] All 3x3 data read, moving to PREPARE");
                         state <= S_PREPARE_BLOCK;
+                        read_count <= 4'd0;  // 다음 블록을 위해 리셋
                     end
                 end
                 
@@ -372,13 +374,23 @@ module MPDMAC_ENGINE
                     end
                     
                     if (r_handshake) begin
-                        buffer_3x3[read_count] <= rdata_i;
-                        $display("[DEBUG] Read DATA: buffer[%d] = %d (0x%h)", read_count, rdata_i, rdata_i);
-                        read_count <= read_count + 1;
+                        // 버스트로 읽은 데이터를 올바른 버퍼 위치에 저장
+                        // read_count는 전체 9개 중 몇 번째인지 나타냄
+                        // burst_count는 현재 버스트 내에서 몇 번째인지 나타냄
+                        reg [3:0] row_idx, col_idx;
+                        row_idx = read_count / 3;  // 0, 1, 2
+                        col_idx = 2 - burst_count; // burst_count: 2,1,0 → col_idx: 0,1,2
+                        
+                        // 3x3 버퍼의 정확한 인덱스 계산
+                        buffer_3x3[row_idx * 3 + col_idx] <= rdata_i;
+                        $display("[DEBUG] Read DATA: buffer[%d] (row=%d,col=%d) = %d (0x%h)", 
+                                 row_idx * 3 + col_idx, row_idx, col_idx, rdata_i, rdata_i);
+                        
                         burst_count <= burst_count - 1;
                         
                         if (rlast_i) begin
                             r_ready <= 1'b0;
+                            read_count <= read_count + 3;  // 한 번에 3개씩 읽음
                             state <= S_READ_REQ;
                         end
                     end

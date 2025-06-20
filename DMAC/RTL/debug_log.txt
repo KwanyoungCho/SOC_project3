@@ -15,12 +15,33 @@
 [DEBUG] Read DATA: buffer[ 7] =        443 (0x000001bb)
 [DEBUG] Read DATA: buffer[ 8] =       2433 (0x00000981)
 [DEBUG] All 3x3 data read, moving to PREPARE
+[DEBUG] First block calc: out( 0, 0) -> src(          2,          2) -> rel(          1,          1) vs center(          1,          1)
+[DEBUG] First block buffer: index=          8, value=      2433
+[DEBUG] First block calc: out( 0, 1) -> src(          2,          1) -> rel(          1,          0) vs center(          1,          1)
+[DEBUG] First block buffer: index=          7, value=       443
+[DEBUG] First block calc: out( 1, 0) -> src(          1,          2) -> rel(          0,          1) vs center(          1,          1)
+[DEBUG] First block buffer: index=          5, value=      3218
+[DEBUG] First block calc: out( 1, 1) -> src(          1,          1) -> rel(          0,          0) vs center(          1,          1)
+[DEBUG] First block buffer: index=          4, value=       205
 [DEBUG] PREPARE: block( 0, 0) center(          1,          1)
 [DEBUG] Output positions: TL( 0, 0) TR( 0,         1) BL(         1, 0) BR(         1,         1)
 [DEBUG] 3x3 Buffer:
          633        205       3218
          633        205       3218
          587        443       2433
+[DEBUG] First block output calculation:
+[DEBUG] First block calc: out( 0, 0) -> src(          2,          2) -> rel(          1,          1) vs center(          1,          1)
+[DEBUG] First block buffer: index=          8, value=      2433
+  TL(0,0) -> value=      2433
+[DEBUG] First block calc: out( 0, 1) -> src(          2,          1) -> rel(          1,          0) vs center(          1,          1)
+[DEBUG] First block buffer: index=          7, value=       443
+  TR(0,1) -> value=       443
+[DEBUG] First block calc: out( 1, 0) -> src(          1,          2) -> rel(          0,          1) vs center(          1,          1)
+[DEBUG] First block buffer: index=          5, value=      3218
+  BL(1,0) -> value=      3218
+[DEBUG] First block calc: out( 1, 1) -> src(          1,          1) -> rel(          0,          0) vs center(          1,          1)
+[DEBUG] First block buffer: index=          4, value=       205
+  BR(1,1) -> value=       205
 [DEBUG] Write REQ[0]: addr=00000a00 data=      2433
 [DEBUG] Write DATA[0]: sending data=      2433
 [DEBUG] Write REQ[1]: addr=00000a04 data=       443

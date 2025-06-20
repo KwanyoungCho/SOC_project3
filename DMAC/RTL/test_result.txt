@@ -69,3 +69,4 @@ Error: answer_matrix[8][0] != transferred_matrix[0][8] | MissMatch!
 Error: answer_matrix[8][1] != transferred_matrix[1][8] | MissMatch!
 Error: answer_matrix[9][0] != transferred_matrix[0][9] | MissMatch!
 Error: answer_matrix[9][1] != transferred_matrix[1][9] | MissMatch!
+TestCase 3 Fail!
