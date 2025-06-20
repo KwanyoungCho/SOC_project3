@@ -109,7 +109,6 @@ module MPDMAC_ENGINE
     reg                     awvalid;
     reg                     wvalid;
     reg                     done, done_n;
-    reg [31:0]              wdata_reg;
     
     // SGDMAC handshake patterns
     wire ar_handshake = arvalid_o & arready_i;
@@ -329,7 +328,7 @@ module MPDMAC_ENGINE
             // 현재 행의 cnt번째 데이터 반환
             buf_y = row;
             buf_x = cnt;
-            get_output_data = buffer[buf_x][buf_y];
+            get_output_data = buffer[cnt][row];
         end
     endfunction
     
@@ -369,11 +368,6 @@ module MPDMAC_ENGINE
             write_row <= write_row_n;
             block_type <= block_type_n;
             done <= done_n;
-            
-            // Update wdata_reg when in WDATA state
-            if (state == S_WDATA || state_n == S_WDATA) begin
-                wdata_reg <= get_output_data(write_cnt, write_row, block_type);
-            end
         end
     end
 
@@ -658,7 +652,7 @@ module MPDMAC_ENGINE
     assign awvalid_o = awvalid;
 
     assign wid_o = 4'd0;
-    assign wdata_o = wdata_reg;
+    assign wdata_o = get_output_data(write_cnt, write_row, block_type);
     assign wstrb_o = 4'b1111;         // all bytes valid
     assign wlast_o = (state == S_WDATA) & is_last_beat;  // SGDMAC 패턴
     assign wvalid_o = wvalid;
