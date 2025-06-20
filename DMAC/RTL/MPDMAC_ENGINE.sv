@@ -230,7 +230,7 @@ module MPDMAC_ENGINE
                 end
                 TYPE_B: begin
                     // B: (1,5)에서 시작 (bottom padding)
-                    dst_row = by * 4 + 5 + wrow;
+                    dst_row = by * 4 + 1 + wrow;
                     dst_col = bx * 4 + 1;
                 end
                 TYPE_L: begin
@@ -241,7 +241,7 @@ module MPDMAC_ENGINE
                 TYPE_R: begin
                     // R: (5,1)에서 시작 (right padding)
                     dst_row = by * 4 + 1 + wrow;
-                    dst_col = bx * 4 + 5;
+                    dst_col = bx * 4 + 1;
                 end
                 TYPE_INNER: begin
                     // INNER: (1,1)에서 시작 (no padding)
