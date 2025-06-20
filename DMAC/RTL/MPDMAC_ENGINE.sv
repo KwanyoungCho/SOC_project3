@@ -329,7 +329,6 @@ module MPDMAC_ENGINE
             buf_y = row;
             buf_x = cnt;
             get_output_data = buffer[buf_x][buf_y];
-            $display("[DEBUG] get_output_data: cnt=%d, row=%d, data=%d", cnt, row, get_output_data);
         end
     endfunction
     
@@ -396,8 +395,8 @@ module MPDMAC_ENGINE
         awvalid = 1'b0;
         wvalid = 1'b0;
 
-            case (state)
-                S_IDLE: begin
+        case (state)
+            S_IDLE: begin
                 done_n = 1'b1;
                 if (start_i && mat_width_i != 0) begin
                     done_n = 1'b0;
@@ -412,10 +411,6 @@ module MPDMAC_ENGINE
                     read_col_n = 2'd0;
                     block_type_n = detect_block_type(6'd0, 6'd0, mat_width_i >> 2, mat_width_i >> 2);
                     
-                    $display("[DEBUG] Starting DMA: src=%h, dst=%h, width=%d", 
-                            src_addr_i, dst_addr_i, mat_width_i);
-                    $display("[DEBUG] Blocks: %dx%d", mat_width_i >> 2, mat_width_i >> 2);
-                    
                     state_n = S_RREQ;
                 end
             end
@@ -425,9 +420,6 @@ module MPDMAC_ENGINE
                 if (ar_handshake) begin
                     state_n = S_RDATA;
                     read_col_n = 2'd0;
-                    
-                    $display("[DEBUG] Read REQ: block(%d,%d), type=%s, row=%d, addr=%h", 
-                            block_x, block_y, get_block_type_name(block_type), read_row, araddr_o);
                 end
             end
             
@@ -435,10 +427,6 @@ module MPDMAC_ENGINE
                 rready = 1'b1;
                 if (r_handshake) begin
                     read_col_n = read_col + 1;
-                    
-                    $display("[DEBUG] Read DATA[%d,%d] = %d -> buffer[%d][%d]", 
-                            read_row, read_col, rdata_i,
-                            get_base_x(block_type) + read_col, get_base_y(block_type) + read_row);
                     
                     if (read_burst_complete) begin
                         // One row completed
@@ -461,9 +449,6 @@ module MPDMAC_ENGINE
                 write_row_n = 3'd0; 
                 write_len_n = get_row_len(block_type, 3'd0); // 첫 번째 행 길이
                 state_n = S_WREQ;
-                
-                $display("[DEBUG] Processing block type %d, total_rows=%d", block_type, get_total_rows(block_type));
-                $display("[DEBUG] Starting row 0, len=%d, awlen will be %d", get_row_len(block_type, 3'd0), get_row_len(block_type, 3'd0) - 1);
             end
             
             S_WREQ: begin
@@ -471,13 +456,6 @@ module MPDMAC_ENGINE
                 if (aw_handshake) begin
                     state_n = S_WDATA;
                     burst_cnt_n = awlen_o;  // RTL_new 패턴: awlen_o 값으로 초기화
-                    
-                    $display("[DEBUG] Write REQ: block(%d,%d), type=%s, row=%d, len=%d, addr=%h", 
-                            block_x, block_y, get_block_type_name(block_type), write_row, awlen_o, awaddr_o);
-                    $display("[DEBUG] write_len=%d, awlen_o=%d, burst_cnt_n=%d", 
-                            write_len, awlen_o, awlen_o);
-                    $display("[DEBUG] Buffer row %d: [0]=%d, [1]=%d, [2]=%d, [3]=%d, [4]=%d", 
-                            write_row, buffer[0][write_row], buffer[1][write_row], buffer[2][write_row], buffer[3][write_row], buffer[4][write_row]);
                 end
             end
             
@@ -486,9 +464,6 @@ module MPDMAC_ENGINE
                 if (w_handshake) begin
                     write_cnt_n = write_cnt + 1;
                     burst_cnt_n = burst_cnt - 1;  // SGDMAC 패턴: burst counter 감소
-                    
-                    $display("[DEBUG] Write DATA[%d] = %d (from buffer[%d][%d])", 
-                            write_cnt, wdata_o, write_cnt, write_row);
                     
                     if (is_last_beat) begin
                         // RTL_new 패턴: wlast와 동시에 response 처리
@@ -499,7 +474,6 @@ module MPDMAC_ENGINE
                                 if (all_blocks_done) begin
                                     state_n = S_IDLE;
                                     done_n = 1'b1;
-                                    $display("[DEBUG] All blocks completed!");
                                 end else begin
                                     // Move to next block immediately (row-major order)
                                     if (block_x == blocks_per_row - 1) begin
@@ -512,8 +486,6 @@ module MPDMAC_ENGINE
                                     read_row_n = 2'd0;
                                     block_type_n = detect_block_type(block_x_n, block_y_n, blocks_per_row, blocks_per_col);
                                     state_n = S_RREQ;
-                                    $display("[DEBUG] Block (%d,%d) type=%s completed, moving to (%d,%d)", 
-                                            block_x, block_y, get_block_type_name(block_type), block_x_n, block_y_n);
                                 end
                             end else begin
                                 // 다음 행으로 이동
@@ -521,15 +493,14 @@ module MPDMAC_ENGINE
                                 write_cnt_n = 3'd0;
                                 write_len_n = get_row_len(block_type, write_row + 1);
                                 state_n = S_WREQ;
-                                $display("[DEBUG] Row %d completed, moving to row %d", write_row, write_row + 1);
                             end
                         end else begin
                             // Wait for response in next state
                             state_n = S_WRESP;
                         end
                     end
-                    end
                 end
+            end
                 
             S_WRESP: begin
                 // SGDMAC 패턴: response 대기 상태
@@ -539,7 +510,6 @@ module MPDMAC_ENGINE
                         if (all_blocks_done) begin
                             state_n = S_IDLE;
                             done_n = 1'b1;
-                            $display("[DEBUG] All blocks completed!");
                         end else begin
                             // Move to next block (row-major order)
                             if (block_x == blocks_per_row - 1) begin
@@ -553,9 +523,6 @@ module MPDMAC_ENGINE
                             read_row_n = 2'd0;
                             block_type_n = detect_block_type(block_x_n, block_y_n, blocks_per_row, blocks_per_col);
                             state_n = S_RREQ;
-                            
-                            $display("[DEBUG] Block (%d,%d) type=%s completed, moving to (%d,%d)", 
-                                    block_x, block_y, get_block_type_name(block_type), block_x_n, block_y_n);
                         end
                     end else begin
                         // 다음 행으로 이동
@@ -563,7 +530,6 @@ module MPDMAC_ENGINE
                         write_cnt_n = 3'd0;
                         write_len_n = get_row_len(block_type, write_row + 1);
                         state_n = S_WREQ;
-                        $display("[DEBUG] Row %d completed, moving to row %d", write_row, write_row + 1);
                     end
                 end
             end
@@ -584,8 +550,6 @@ module MPDMAC_ENGINE
             // Store read data in buffer
             if (state == S_RDATA && rvalid_i && rready_o) begin
                 buffer[get_base_x(block_type) + read_col][get_base_y(block_type) + read_row] <= rdata_i;
-                $display("[DEBUG] Storing rdata=%d at buffer[%d][%d]", rdata_i, 
-                        get_base_x(block_type) + read_col, get_base_y(block_type) + read_row);
             end
             
             // Apply padding in S_PROCESS state
@@ -596,9 +560,6 @@ module MPDMAC_ENGINE
                         buffer[0][0] <= buffer[2][2];  // corner = 첫 번째 데이터
                         for (i = 1; i < 5; i = i + 1) buffer[i][0] <= buffer[i][2];  // top row
                         for (j = 1; j < 5; j = j + 1) buffer[0][j] <= buffer[2][j];  // left col
-                        $display("[DEBUG] TL padding: corner buffer[0][0]=%d from buffer[2][2]", buffer[2][2]);
-                        $display("[DEBUG] TL padding values: [1][0]=%d, [2][0]=%d, [3][0]=%d, [4][0]=%d", 
-                                buffer[1][2], buffer[2][2], buffer[3][2], buffer[4][2]);
                     end
                     TYPE_TR: begin
                         // TR: (0,1) 기준으로 4x4 저장됨
