@@ -129,6 +129,25 @@ module MPDMAC_ENGINE
     wire current_block_done = (block_x == blocks_per_row - 1) && (block_y == blocks_per_col - 1);
     wire all_blocks_done = current_block_done;
     
+    // Block type name for debug
+    function string get_block_type_name;
+        input [3:0] btype;
+        begin
+            case (btype)
+                TYPE_TL:    get_block_type_name = "TL";
+                TYPE_TR:    get_block_type_name = "TR";
+                TYPE_BL:    get_block_type_name = "BL";
+                TYPE_BR:    get_block_type_name = "BR";
+                TYPE_T:     get_block_type_name = "T";
+                TYPE_B:     get_block_type_name = "B";
+                TYPE_L:     get_block_type_name = "L";
+                TYPE_R:     get_block_type_name = "R";
+                TYPE_INNER: get_block_type_name = "INNER";
+                default:    get_block_type_name = "UNKNOWN";
+            endcase
+        end
+    endfunction
+    
     // Block type detection function
     function [3:0] detect_block_type;
         input [5:0] bx, by;
@@ -377,8 +396,8 @@ module MPDMAC_ENGINE
                     state_n = S_RDATA;
                     read_col_n = 2'd0;
                     
-                    $display("[DEBUG] Read REQ: block(%d,%d), row=%d, addr=%h", 
-                            block_x, block_y, read_row, araddr_o);
+                    $display("[DEBUG] Read REQ: block(%d,%d), type=%s, row=%d, addr=%h", 
+                            block_x, block_y, get_block_type_name(block_type), read_row, araddr_o);
                 end
             end
             
@@ -421,8 +440,8 @@ module MPDMAC_ENGINE
                     state_n = S_WDATA;
                     burst_cnt_n = awlen_o;  // RTL_new 패턴: awlen_o 값으로 초기화
                     
-                    $display("[DEBUG] Write REQ: block(%d,%d), len=%d, addr=%h", 
-                            block_x, block_y, awlen_o, awaddr_o);
+                    $display("[DEBUG] Write REQ: block(%d,%d), type=%s, len=%d, addr=%h", 
+                            block_x, block_y, get_block_type_name(block_type), awlen_o, awaddr_o);
                 end
             end
             
@@ -454,8 +473,8 @@ module MPDMAC_ENGINE
                                 read_row_n = 2'd0;
                                 block_type_n = detect_block_type(block_x_n, block_y_n, blocks_per_row, blocks_per_col);
                                 state_n = S_RREQ;
-                                $display("[DEBUG] Block (%d,%d) completed, moving to (%d,%d)", 
-                                        block_x, block_y, block_x_n, block_y_n);
+                                $display("[DEBUG] Block (%d,%d) type=%s completed, moving to (%d,%d)", 
+                                        block_x, block_y, get_block_type_name(block_type), block_x_n, block_y_n);
                             end
                         end else begin
                             // Wait for response in next state
@@ -483,8 +502,8 @@ module MPDMAC_ENGINE
                         read_row_n = 2'd0;
                         block_type_n = detect_block_type(block_x_n, block_y_n, blocks_per_row, blocks_per_col);
                         
-                        $display("[DEBUG] Block (%d,%d) completed, moving to (%d,%d)", 
-                                block_x, block_y, block_x_n, block_y_n);
+                        $display("[DEBUG] Block (%d,%d) type=%s completed, moving to (%d,%d)", 
+                                block_x, block_y, get_block_type_name(block_type), block_x_n, block_y_n);
                     end else begin
                         done_n = 1'b1;
                         $display("[DEBUG] All blocks completed!");
