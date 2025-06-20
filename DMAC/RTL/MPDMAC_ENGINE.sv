@@ -148,6 +148,23 @@ module MPDMAC_ENGINE
         end
     endfunction
     
+    // State name for debug
+    function string get_state_name;
+        input [2:0] st;
+        begin
+            case (st)
+                S_IDLE: get_state_name = "S_IDLE";
+                S_RREQ: get_state_name = "S_RREQ";
+                S_RDATA: get_state_name = "S_RDATA";
+                S_PROCESS: get_state_name = "S_PROCESS";
+                S_WREQ: get_state_name = "S_WREQ";
+                S_WDATA: get_state_name = "S_WDATA";
+                S_WRESP: get_state_name = "S_WRESP";
+                default: get_state_name = "UNKNOWN";
+            endcase
+        end
+    endfunction
+    
     // Block type detection function
     function [3:0] detect_block_type;
         input [5:0] bx, by;
@@ -325,6 +342,10 @@ module MPDMAC_ENGINE
             block_type <= 4'd0;
             done <= 1'b1;
         end else begin
+            if (state != state_n) begin
+                $display("[DEBUG] State transition: %s -> %s for block(%d,%d)", 
+                        get_state_name(state), get_state_name(state_n), block_x, block_y);
+            end
             state <= state_n;
             src_addr <= src_addr_n;
             dst_addr <= dst_addr_n;
@@ -415,6 +436,7 @@ module MPDMAC_ENGINE
                         read_col_n = 2'd0;  // Reset column for next row
                         if (read_4x4_complete) begin
                             // All 4 rows read, process padding
+                            $display("[DEBUG] 4x4 read complete for block(%d,%d), moving to S_PROCESS", block_x, block_y);
                             state_n = S_PROCESS;
                         end else begin
                             // Read next row
@@ -431,7 +453,11 @@ module MPDMAC_ENGINE
                 write_len_n = get_output_len(block_type);
                 state_n = S_WREQ;
                 
+                $display("[DEBUG] BEFORE Processing: current block=(%d,%d), type=%s", 
+                        block_x, block_y, get_block_type_name(block_type));
                 $display("[DEBUG] Processing block type %d, output_len=%d", block_type, get_output_len(block_type));
+                $display("[DEBUG] AFTER Processing: current block=(%d,%d), type=%s, next_state=S_WREQ", 
+                        block_x, block_y, get_block_type_name(block_type));
             end
             
             S_WREQ: begin
@@ -533,6 +559,8 @@ module MPDMAC_ENGINE
             
             // Apply padding in S_PROCESS state
             if (state == S_PROCESS) begin
+                $display("[DEBUG] Applying padding for block(%d,%d), type=%s in always_ff", 
+                        block_x, block_y, get_block_type_name(block_type));
                 case (block_type)
                     TYPE_TL: begin
                         // TL: (1,1) 기준으로 4x4 저장됨, padding 적용
