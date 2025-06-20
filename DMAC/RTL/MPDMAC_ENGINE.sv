@@ -522,43 +522,43 @@ module MPDMAC_ENGINE
                 case (block_type)
                     TYPE_TL: begin
                         // TL: (1,1) 기준으로 4x4 저장됨, padding 적용
-                        buffer[0][0] <= buffer[1][1];  // corner = 첫 번째 데이터
-                        for (i = 1; i < 5; i = i + 1) buffer[i][0] <= buffer[i][1];  // top row
-                        for (j = 1; j < 5; j = j + 1) buffer[0][j] <= buffer[1][j];  // left col
+                        buffer[0][0] <= buffer[2][2];  // corner = 첫 번째 데이터
+                        for (i = 1; i < 5; i = i + 1) buffer[i][0] <= buffer[i][2];  // top row
+                        for (j = 1; j < 5; j = j + 1) buffer[0][j] <= buffer[2][j];  // left col
                     end
                     TYPE_TR: begin
                         // TR: (0,1) 기준으로 4x4 저장됨
-                        buffer[4][0] <= buffer[3][1];  // corner = 마지막 첫행 데이터
-                        for (i = 0; i < 4; i = i + 1) buffer[i][0] <= buffer[i][1];  // top row
-                        for (j = 1; j < 5; j = j + 1) buffer[4][j] <= buffer[3][j];  // right col
+                        buffer[4][0] <= buffer[2][2];  // corner = 마지막 첫행 데이터
+                        for (i = 0; i < 4; i = i + 1) buffer[i][0] <= buffer[i][2];  // top row
+                        for (j = 1; j < 5; j = j + 1) buffer[4][j] <= buffer[2][j];  // right col
                     end
                     TYPE_BL: begin
                         // BL: (1,0) 기준으로 4x4 저장됨
-                        buffer[0][4] <= buffer[1][3];  // corner = 첫 마지막행 데이터
-                        for (i = 1; i < 5; i = i + 1) buffer[i][4] <= buffer[i][3];  // bottom row
-                        for (j = 0; j < 4; j = j + 1) buffer[0][j] <= buffer[1][j];  // left col
+                        buffer[0][4] <= buffer[2][2];  // corner = 첫 마지막행 데이터
+                        for (i = 1; i < 5; i = i + 1) buffer[i][4] <= buffer[i][2];  // bottom row
+                        for (j = 0; j < 4; j = j + 1) buffer[0][j] <= buffer[2][j];  // left col
                     end
                     TYPE_BR: begin
                         // BR: (0,0) 기준으로 4x4 저장됨
-                        buffer[4][4] <= buffer[3][3];  // corner = 마지막 마지막 데이터
-                        for (i = 0; i < 4; i = i + 1) buffer[i][4] <= buffer[i][3];  // bottom row
-                        for (j = 0; j < 4; j = j + 1) buffer[4][j] <= buffer[3][j];  // right col
+                        buffer[4][4] <= buffer[2][2];  // corner = 마지막 마지막 데이터
+                        for (i = 0; i < 4; i = i + 1) buffer[i][4] <= buffer[i][2];  // bottom row
+                        for (j = 0; j < 4; j = j + 1) buffer[4][j] <= buffer[2][j];  // right col
                     end
                     TYPE_T: begin
                         // T: (0,1) 기준으로 4x4 저장됨, top padding만
-                        for (i = 0; i < 4; i = i + 1) buffer[i][0] <= buffer[i][1];  // top row
+                        for (i = 0; i < 4; i = i + 1) buffer[i][0] <= buffer[i][2];  // top row
                     end
                     TYPE_B: begin
                         // B: (0,0) 기준으로 4x4 저장됨, bottom padding만
-                        for (i = 0; i < 4; i = i + 1) buffer[i][4] <= buffer[i][3];  // bottom row
+                        for (i = 0; i < 4; i = i + 1) buffer[i][4] <= buffer[i][2];  // bottom row
                     end
                     TYPE_L: begin
                         // L: (1,0) 기준으로 4x4 저장됨, left padding만
-                        for (j = 0; j < 4; j = j + 1) buffer[0][j] <= buffer[1][j];  // left col
+                        for (j = 0; j < 4; j = j + 1) buffer[0][j] <= buffer[2][j];  // left col
                     end
                     TYPE_R: begin
                         // R: (0,0) 기준으로 4x4 저장됨, right padding만
-                        for (j = 0; j < 4; j = j + 1) buffer[4][j] <= buffer[3][j];  // right col
+                        for (j = 0; j < 4; j = j + 1) buffer[4][j] <= buffer[2][j];  // right col
                     end
                     TYPE_INNER: begin
                         // INNER: (1,1) 기준으로 4x4 저장됨, padding 없음
