@@ -204,24 +204,24 @@ module MPDMAC_ENGINE
             // 패딩된 매트릭스에서의 올바른 시작 위치 계산
             case (btype)
                 TYPE_TL: begin
-                    // TL: (0,0)에서 시작
+                    // TL: (bx*4, by*4)에서 시작
                     dst_row = by * 4 + wrow;
                     dst_col = bx * 4;
                 end
                 TYPE_TR: begin  
-                    // TR: (4,0)에서 시작
+                    // TR: (bx*4+4, by*4)에서 시작
                     dst_row = by * 4 + wrow;
-                    dst_col = bx * 4;
+                    dst_col = bx * 4 + 4;
                 end
                 TYPE_BL: begin
-                    // BL: (0,4)에서 시작  
+                    // BL: (bx*4, by*4+4)에서 시작  
                     dst_row = by * 4 + 4 + wrow;
                     dst_col = bx * 4;
                 end
                 TYPE_BR: begin
-                    // BR: (4,4)에서 시작
+                    // BR: (bx*4+4, by*4+4)에서 시작
                     dst_row = by * 4 + 4 + wrow;
-                    dst_col = bx * 4;
+                    dst_col = bx * 4 + 4;
                 end
                 TYPE_T: begin
                     // T: (1,0)에서 시작 (top padding)
