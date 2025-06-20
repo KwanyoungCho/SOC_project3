@@ -126,8 +126,9 @@ module MPDMAC_ENGINE
     wire write_data_available = 1'b1;  // 버퍼에서 항상 데이터 사용 가능
     
     // Helper signals  
-    wire all_blocks_done = (block_y >= blocks_per_col) | 
-                          ((block_y == blocks_per_col - 1) & (block_x >= blocks_per_row - 1));
+    wire next_block_x = (block_x == blocks_per_row - 1) ? 6'd0 : block_x + 1;
+    wire next_block_y = (block_x == blocks_per_row - 1) ? block_y + 1 : block_y;
+    wire all_blocks_done = (next_block_y >= blocks_per_col);
     
     // Block type detection function
     function [3:0] detect_block_type;
@@ -449,12 +450,8 @@ module MPDMAC_ENGINE
                         
                         if (b_handshake && !all_blocks_done) begin
                             // Move to next block
-                            if (block_x == blocks_per_row - 1) begin
-                                block_x_n = 6'd0;
-                                block_y_n = block_y + 1;
-                            end else begin
-                                block_x_n = block_x + 1;
-                            end
+                            block_x_n = next_block_x;
+                            block_y_n = next_block_y;
                             
                             read_row_n = 2'd0;
                             block_type_n = detect_block_type(block_x_n, block_y_n, blocks_per_row, blocks_per_col);
@@ -478,12 +475,8 @@ module MPDMAC_ENGINE
                     
                     if (!all_blocks_done) begin
                         // Move to next block
-                        if (block_x == blocks_per_row - 1) begin
-                            block_x_n = 6'd0;
-                            block_y_n = block_y + 1;
-                        end else begin
-                            block_x_n = block_x + 1;
-                        end
+                        block_x_n = next_block_x;
+                        block_y_n = next_block_y;
                         
                         read_row_n = 2'd0;
                         block_type_n = detect_block_type(block_x_n, block_y_n, blocks_per_row, blocks_per_col);
@@ -522,40 +515,43 @@ module MPDMAC_ENGINE
                 case (block_type)
                     TYPE_TL: begin
                         // TL: (1,1) 기준으로 4x4 저장됨, padding 적용
-                        buffer[0][0] <= buffer[2][2];  // corner
-                        for (i = 0; i < 5; i = i + 1) buffer[i][0] <= buffer[i][2];  // top row
-                        for (j = 0; j < 5; j = j + 1) buffer[0][j] <= buffer[2][j];  // left col
+                        buffer[0][0] <= buffer[1][1];  // corner = 첫 번째 데이터
+                        for (i = 1; i < 5; i = i + 1) buffer[i][0] <= buffer[i][1];  // top row
+                        for (j = 1; j < 5; j = j + 1) buffer[0][j] <= buffer[1][j];  // left col
                     end
                     TYPE_TR: begin
                         // TR: (0,1) 기준으로 4x4 저장됨
-                        for (i = 0; i < 5; i = i + 1) buffer[i][0] <= buffer[i][2];  // top row
-                        for (j = 0; j < 5; j = j + 1) buffer[4][j] <= buffer[2][j];  // right col
+                        buffer[4][0] <= buffer[3][1];  // corner = 마지막 첫행 데이터
+                        for (i = 0; i < 4; i = i + 1) buffer[i][0] <= buffer[i][1];  // top row
+                        for (j = 1; j < 5; j = j + 1) buffer[4][j] <= buffer[3][j];  // right col
                     end
                     TYPE_BL: begin
                         // BL: (1,0) 기준으로 4x4 저장됨
-                        for (i = 0; i < 5; i = i + 1) buffer[i][4] <= buffer[i][2];  // bottom row
-                        for (j = 0; j < 5; j = j + 1) buffer[0][j] <= buffer[2][j];  // left col
+                        buffer[0][4] <= buffer[1][3];  // corner = 첫 마지막행 데이터
+                        for (i = 1; i < 5; i = i + 1) buffer[i][4] <= buffer[i][3];  // bottom row
+                        for (j = 0; j < 4; j = j + 1) buffer[0][j] <= buffer[1][j];  // left col
                     end
                     TYPE_BR: begin
                         // BR: (0,0) 기준으로 4x4 저장됨
-                        for (i = 0; i < 5; i = i + 1) buffer[i][4] <= buffer[i][2];  // bottom row
-                        for (j = 0; j < 5; j = j + 1) buffer[4][j] <= buffer[2][j];  // right col
+                        buffer[4][4] <= buffer[3][3];  // corner = 마지막 마지막 데이터
+                        for (i = 0; i < 4; i = i + 1) buffer[i][4] <= buffer[i][3];  // bottom row
+                        for (j = 0; j < 4; j = j + 1) buffer[4][j] <= buffer[3][j];  // right col
                     end
                     TYPE_T: begin
                         // T: (0,1) 기준으로 4x4 저장됨, top padding만
-                        for (i = 0; i < 5; i = i + 1) buffer[i][0] <= buffer[i][2];  // top row
+                        for (i = 0; i < 4; i = i + 1) buffer[i][0] <= buffer[i][1];  // top row
                     end
                     TYPE_B: begin
                         // B: (0,0) 기준으로 4x4 저장됨, bottom padding만
-                        for (i = 0; i < 5; i = i + 1) buffer[i][4] <= buffer[i][2];  // bottom row
+                        for (i = 0; i < 4; i = i + 1) buffer[i][4] <= buffer[i][3];  // bottom row
                     end
                     TYPE_L: begin
                         // L: (1,0) 기준으로 4x4 저장됨, left padding만
-                        for (j = 0; j < 5; j = j + 1) buffer[0][j] <= buffer[2][j];  // left col
+                        for (j = 0; j < 4; j = j + 1) buffer[0][j] <= buffer[1][j];  // left col
                     end
                     TYPE_R: begin
                         // R: (0,0) 기준으로 4x4 저장됨, right padding만
-                        for (j = 0; j < 5; j = j + 1) buffer[4][j] <= buffer[2][j];  // right col
+                        for (j = 0; j < 4; j = j + 1) buffer[4][j] <= buffer[3][j];  // right col
                     end
                     TYPE_INNER: begin
                         // INNER: (1,1) 기준으로 4x4 저장됨, padding 없음
