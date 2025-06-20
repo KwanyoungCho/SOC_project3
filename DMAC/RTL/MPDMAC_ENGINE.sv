@@ -203,36 +203,36 @@ module MPDMAC_ENGINE
     endfunction
     
     // Get buffer base coordinates for storing read data
-    function [1:0] get_base_x;
+    function [2:0] get_base_x;  // 3비트로 수정 (0~4 표현 가능)
         input [3:0] btype;
         begin
             case (btype)
-                TYPE_TL:    get_base_x = 2'd1;
-                TYPE_TR:    get_base_x = 2'd0;
-                TYPE_BL:    get_base_x = 2'd1;
-                TYPE_BR:    get_base_x = 2'd0;
-                TYPE_T:     get_base_x = 2'd0;
-                TYPE_B:     get_base_x = 2'd0;
-                TYPE_L:     get_base_x = 2'd1;
-                TYPE_R:     get_base_x = 2'd0;
-                default:    get_base_x = 2'd1; // TYPE_INNER
+                TYPE_TL:    get_base_x = 3'd1;
+                TYPE_TR:    get_base_x = 3'd0;
+                TYPE_BL:    get_base_x = 3'd1;
+                TYPE_BR:    get_base_x = 3'd0;
+                TYPE_T:     get_base_x = 3'd0;
+                TYPE_B:     get_base_x = 3'd0;
+                TYPE_L:     get_base_x = 3'd1;
+                TYPE_R:     get_base_x = 3'd0;
+                default:    get_base_x = 3'd1; // TYPE_INNER
             endcase
         end
     endfunction
     
-    function [1:0] get_base_y;
+    function [2:0] get_base_y;  // 3비트로 수정
         input [3:0] btype;
         begin
             case (btype)
-                TYPE_TL:    get_base_y = 2'd1;
-                TYPE_TR:    get_base_y = 2'd1;
-                TYPE_BL:    get_base_y = 2'd0;
-                TYPE_BR:    get_base_y = 2'd0;
-                TYPE_T:     get_base_y = 2'd1;
-                TYPE_B:     get_base_y = 2'd0;
-                TYPE_L:     get_base_y = 2'd0;
-                TYPE_R:     get_base_y = 2'd0;
-                default:    get_base_y = 2'd1; // TYPE_INNER
+                TYPE_TL:    get_base_y = 3'd1;
+                TYPE_TR:    get_base_y = 3'd1;
+                TYPE_BL:    get_base_y = 3'd0;
+                TYPE_BR:    get_base_y = 3'd0;
+                TYPE_T:     get_base_y = 3'd1;
+                TYPE_B:     get_base_y = 3'd0;
+                TYPE_L:     get_base_y = 3'd0;
+                TYPE_R:     get_base_y = 3'd0;
+                default:    get_base_y = 3'd1; // TYPE_INNER
             endcase
         end
     endfunction

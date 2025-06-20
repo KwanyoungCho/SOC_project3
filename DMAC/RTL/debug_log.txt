@@ -1,6 +1,5 @@
 [DEBUG] Starting DMA: src=00000000, dst=00000a00, width= 8
 [DEBUG] Blocks:  2x 2
-[DEBUG] All blocks completed!
 [DEBUG] Read REQ: block( 0, 0), row=0, addr=00000000
 [DEBUG] Read DATA[0,0] =        633 -> buffer[1][1]
 [DEBUG] Storing rdata=       633 at buffer[1][1]
@@ -57,7 +56,7 @@
 [DEBUG] Write DATA[ 1] =        587
 [DEBUG] Write DATA[ 2] =        443
 [DEBUG] Write DATA[ 3] =       2433
-[DEBUG] Write DATA[ 4] =        870
+[DEBUG] Write DATA[ 4] =        179
 [DEBUG] Write DATA[ 5] =        205
 [DEBUG] Write DATA[ 6] =        633
 [DEBUG] Write DATA[ 7] =        205
@@ -187,4 +186,65 @@
 [DEBUG] Write DATA[ 7] =       3944
 [DEBUG] Write DATA[ 8] =         20
 [DEBUG] Block ( 0, 1) completed, moving to ( 1, 1)
+[DEBUG] Read REQ: block( 1, 1), row=0, addr=00000090
+[DEBUG] Read DATA[0,0] =       3821 -> buffer[0][0]
+[DEBUG] Storing rdata=      3821 at buffer[0][0]
+[DEBUG] Read DATA[0,1] =       3821 -> buffer[1][0]
+[DEBUG] Read DATA[0,1] =       3505 -> buffer[1][0]
+[DEBUG] Storing rdata=      3505 at buffer[1][0]
+[DEBUG] Read DATA[0,2] =       3505 -> buffer[2][0]
+[DEBUG] Read DATA[0,2] =       3684 -> buffer[2][0]
+[DEBUG] Storing rdata=      3684 at buffer[2][0]
+[DEBUG] Read DATA[0,3] =       3684 -> buffer[3][0]
+[DEBUG] Read DATA[0,3] =         33 -> buffer[3][0]
+[DEBUG] Storing rdata=        33 at buffer[3][0]
+[DEBUG] Read REQ: block( 1, 1), row=1, addr=000000b0
+[DEBUG] Read DATA[1,0] =       1578 -> buffer[0][1]
+[DEBUG] Storing rdata=      1578 at buffer[0][1]
+[DEBUG] Read DATA[1,1] =       1578 -> buffer[1][1]
+[DEBUG] Read DATA[1,1] =       1854 -> buffer[1][1]
+[DEBUG] Storing rdata=      1854 at buffer[1][1]
+[DEBUG] Read DATA[1,2] =       1854 -> buffer[2][1]
+[DEBUG] Read DATA[1,2] =       3831 -> buffer[2][1]
+[DEBUG] Storing rdata=      3831 at buffer[2][1]
+[DEBUG] Read DATA[1,3] =       3831 -> buffer[3][1]
+[DEBUG] Read DATA[1,3] =       3910 -> buffer[3][1]
+[DEBUG] Storing rdata=      3910 at buffer[3][1]
+[DEBUG] Read REQ: block( 1, 1), row=2, addr=000000d0
+[DEBUG] Read DATA[2,0] =        819 -> buffer[0][2]
+[DEBUG] Storing rdata=       819 at buffer[0][2]
+[DEBUG] Read DATA[2,1] =        819 -> buffer[1][2]
+[DEBUG] Read DATA[2,1] =       1792 -> buffer[1][2]
+[DEBUG] Storing rdata=      1792 at buffer[1][2]
+[DEBUG] Read DATA[2,2] =       1792 -> buffer[2][2]
+[DEBUG] Read DATA[2,2] =       3036 -> buffer[2][2]
+[DEBUG] Storing rdata=      3036 at buffer[2][2]
+[DEBUG] Read DATA[2,3] =       3036 -> buffer[3][2]
+[DEBUG] Read DATA[2,3] =       3440 -> buffer[3][2]
+[DEBUG] Storing rdata=      3440 at buffer[3][2]
+[DEBUG] Read REQ: block( 1, 1), row=3, addr=000000f0
+[DEBUG] Read DATA[3,0] =        291 -> buffer[0][3]
+[DEBUG] Storing rdata=       291 at buffer[0][3]
+[DEBUG] Read DATA[3,1] =        291 -> buffer[1][3]
+[DEBUG] Read DATA[3,1] =       3590 -> buffer[1][3]
+[DEBUG] Storing rdata=      3590 at buffer[1][3]
+[DEBUG] Read DATA[3,2] =       3590 -> buffer[2][3]
+[DEBUG] Read DATA[3,2] =         74 -> buffer[2][3]
+[DEBUG] Storing rdata=        74 at buffer[2][3]
+[DEBUG] Read DATA[3,3] =         74 -> buffer[3][3]
+[DEBUG] Read DATA[3,3] =       2378 -> buffer[3][3]
+[DEBUG] Storing rdata=      2378 at buffer[3][3]
+[DEBUG] Processing block type  3, output_len=25
+[DEBUG] Processing block type  3, output_len=25
+[DEBUG] Processing block type  3, output_len=25
+[DEBUG] Write REQ: block( 1, 1), len= 8, addr=00000ab0
+[DEBUG] Write DATA[ 0] =       3821
+[DEBUG] Write DATA[ 1] =       3505
+[DEBUG] Write DATA[ 2] =       3684
+[DEBUG] Write DATA[ 3] =         33
+[DEBUG] Write DATA[ 4] =       3684
+[DEBUG] Write DATA[ 5] =       1578
+[DEBUG] Write DATA[ 6] =       1854
+[DEBUG] Write DATA[ 7] =       3831
+[DEBUG] Write DATA[ 8] =       3910
 [DEBUG] All blocks completed!
