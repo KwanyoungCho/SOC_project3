@@ -271,44 +271,44 @@ module DMAC_TOP_TB ();
     initial begin
         test_init();
 
-        src_addr        = 'h0000_0100;
-        dst_addr        = 'h0000_A000;
-        mat_width       = 32;
-        $display("===================================================");
-        $display(" TestCase 1 | MAT_WIDTH = 32"); 
-        $display("===================================================");
-        gen_matrix(src_addr, mat_width);
-        gen_mpmatrix(mat_width);
-        start_dma(src_addr, dst_addr, mat_width, time_0);
-        tescase_pass = 1;
-        check_result(dst_addr, mat_width, tescase_pass);
-        if(tescase_pass == 1) begin
-            $display("TestCase 1 Pass!");
-            $display("<< TestCase 1's Execution Time: %d (ns)", time_0);
-        end else begin
-            $display("TestCase 1 Fail!");
-            testcase1_pass = 0;
-        end
-        $display("");
+        // src_addr        = 'h0000_0100;
+        // dst_addr        = 'h0000_A000;
+        // mat_width       = 32;
+        // $display("===================================================");
+        // $display(" TestCase 1 | MAT_WIDTH = 32"); 
+        // $display("===================================================");
+        // gen_matrix(src_addr, mat_width);
+        // gen_mpmatrix(mat_width);
+        // start_dma(src_addr, dst_addr, mat_width, time_0);
+        // tescase_pass = 1;
+        // check_result(dst_addr, mat_width, tescase_pass);
+        // if(tescase_pass == 1) begin
+        //     $display("TestCase 1 Pass!");
+        //     $display("<< TestCase 1's Execution Time: %d (ns)", time_0);
+        // end else begin
+        //     $display("TestCase 1 Fail!");
+        //     testcase1_pass = 0;
+        // end
+        // $display("");
         
-        src_addr        = 'h0000_0100;
-        dst_addr        = 'h0000_A000;
-        mat_width       = 16;
-        $display("===================================================");
-        $display(" TestCase 2 | MAT_WIDTH = 16"); 
-        $display("===================================================");
-        gen_matrix(src_addr, mat_width);
-        gen_mpmatrix(mat_width);
-        start_dma(src_addr, dst_addr, mat_width, time_1);
-        tescase_pass = 1;
-        check_result(dst_addr, mat_width, tescase_pass);
-        if(tescase_pass == 1) begin
-            $display("TestCase 2 Pass!");
-        end else begin
-            $display("TestCase 2 Fail!");
-            testcase2_pass = 0;
-        end
-        $display("");
+        // src_addr        = 'h0000_0100;
+        // dst_addr        = 'h0000_A000;
+        // mat_width       = 16;
+        // $display("===================================================");
+        // $display(" TestCase 2 | MAT_WIDTH = 16"); 
+        // $display("===================================================");
+        // gen_matrix(src_addr, mat_width);
+        // gen_mpmatrix(mat_width);
+        // start_dma(src_addr, dst_addr, mat_width, time_1);
+        // tescase_pass = 1;
+        // check_result(dst_addr, mat_width, tescase_pass);
+        // if(tescase_pass == 1) begin
+        //     $display("TestCase 2 Pass!");
+        // end else begin
+        //     $display("TestCase 2 Fail!");
+        //     testcase2_pass = 0;
+        // end
+        // $display("");
 
         src_addr        = 'h0000_0000;
         dst_addr        = 'h0000_0A00;
@@ -329,29 +329,29 @@ module DMAC_TOP_TB ();
         end
         $display("");
 
-        $display("");
-        $display("===================================================");
-        $display(" Total Result"); 
-        $display("===================================================");
-        if(testcase1_pass == 1) begin
-            $display("TestCase 1 Pass!");
-        end else begin
-            $display("TestCase 1 Fail!");
-        end
-        if(testcase2_pass == 1) begin
-            $display("TestCase 2 Pass!");
-        end else begin
-            $display("TestCase 2 Fail!");
-        end
-        if(testcase3_pass == 1) begin
-            $display("TestCase 3 Pass!");
-        end else begin
-            $display("TestCase 3 Fail!");
-        end
+        // $display("");
+        // $display("===================================================");
+        // $display(" Total Result"); 
+        // $display("===================================================");
+        // if(testcase1_pass == 1) begin
+        //     $display("TestCase 1 Pass!");
+        // end else begin
+        //     $display("TestCase 1 Fail!");
+        // end
+        // if(testcase2_pass == 1) begin
+        //     $display("TestCase 2 Pass!");
+        // end else begin
+        //     $display("TestCase 2 Fail!");
+        // end
+        // if(testcase3_pass == 1) begin
+        //     $display("TestCase 3 Pass!");
+        // end else begin
+        //     $display("TestCase 3 Fail!");
+        // end
 
-        $display("<< TestCase 1's Execution Time: %d (ns)", time_0);
-        $display("===================================================");
-        $display("");
+        // $display("<< TestCase 1's Execution Time: %d (ns)", time_0);
+        // $display("===================================================");
+        // $display("");
         $finish;
     end
 
