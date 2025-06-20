@@ -475,6 +475,8 @@ module MPDMAC_ENGINE
                             block_x, block_y, get_block_type_name(block_type), write_row, awlen_o, awaddr_o);
                     $display("[DEBUG] write_len=%d, awlen_o=%d, burst_cnt_n=%d", 
                             write_len, awlen_o, awlen_o);
+                    $display("[DEBUG] Buffer row %d: [0]=%d, [1]=%d, [2]=%d, [3]=%d, [4]=%d", 
+                            write_row, buffer[0][write_row], buffer[1][write_row], buffer[2][write_row], buffer[3][write_row], buffer[4][write_row]);
                 end
             end
             
@@ -594,6 +596,8 @@ module MPDMAC_ENGINE
                         for (i = 1; i < 5; i = i + 1) buffer[i][0] <= buffer[i][2];  // top row
                         for (j = 1; j < 5; j = j + 1) buffer[0][j] <= buffer[2][j];  // left col
                         $display("[DEBUG] TL padding: corner buffer[0][0]=%d from buffer[2][2]", buffer[2][2]);
+                        $display("[DEBUG] TL padding values: [1][0]=%d, [2][0]=%d, [3][0]=%d, [4][0]=%d", 
+                                buffer[1][2], buffer[2][2], buffer[3][2], buffer[4][2]);
                     end
                     TYPE_TR: begin
                         // TR: (0,1) 기준으로 4x4 저장됨
