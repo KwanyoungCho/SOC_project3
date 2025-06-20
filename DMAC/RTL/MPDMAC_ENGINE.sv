@@ -203,30 +203,39 @@ module MPDMAC_ENGINE
         reg signed [6:0] rel_r, rel_c;  // Relative to center
         begin
             // 출력 매트릭스는 (width+2) x (width+2), 소스 매트릭스는 width x width
-            // 출력 좌표를 소스 좌표로 변환 (미러 패딩 포함)
+            // 미러 패딩 매핑 (0-based 출력 좌표 -> 1-based 소스 좌표):
+            // - 출력 row 0 -> 소스 row 2 (원본의 두 번째 행을 미러링)
+            // - 출력 row 1 -> 소스 row 1 (원본의 첫 번째 행)
+            // - 출력 row 2~(width-1) -> 소스 row 2~(width-1)
+            // - 출력 row width -> 소스 row width
+            // - 출력 row (width+1) -> 소스 row (width-1) (원본의 마지막에서 두 번째 행을 미러링)
             
-            // 행 변환: 출력 행 -> 소스 행 (1-based)
+            // 행 변환
             if (out_r == 0) begin
-                // 상단 패딩: 소스의 두 번째 행을 미러링 (1-based로 2)
+                // 상단 패딩: 출력 0행 -> 소스 2행 (1-based)
                 src_r = 2;
             end else if (out_r == width + 1) begin
-                // 하단 패딩: 소스의 마지막에서 두 번째 행을 미러링 (1-based로 width-1)
+                // 하단 패딩: 출력 (width+1)행 -> 소스 (width-1)행 (1-based)
                 src_r = width - 1;
-            end else begin
-                // 일반 영역: out_r은 0-based이므로 1을 더해서 1-based로 변환
+            end else if (out_r >= 1 && out_r <= width) begin
+                // 일반 영역: 출력 행이 그대로 소스 행이 됨 (1-based)
                 src_r = out_r;
+            end else begin
+                src_r = out_r; // 예외 처리
             end
             
-            // 열 변환: 출력 열 -> 소스 열 (1-based)
+            // 열 변환
             if (out_c == 0) begin
-                // 좌측 패딩: 소스의 두 번째 열을 미러링 (1-based로 2)
+                // 좌측 패딩: 출력 0열 -> 소스 2열 (1-based)
                 src_c = 2;
             end else if (out_c == width + 1) begin
-                // 우측 패딩: 소스의 마지막에서 두 번째 열을 미러링 (1-based로 width-1)
+                // 우측 패딩: 출력 (width+1)열 -> 소스 (width-1)열 (1-based)
                 src_c = width - 1;
-            end else begin
-                // 일반 영역: out_c는 0-based이므로 1을 더해서 1-based로 변환
+            end else if (out_c >= 1 && out_c <= width) begin
+                // 일반 영역: 출력 열이 그대로 소스 열이 됨 (1-based)
                 src_c = out_c;
+            end else begin
+                src_c = out_c; // 예외 처리
             end
             
             // 현재 중심에 대한 상대 위치 계산
@@ -239,12 +248,22 @@ module MPDMAC_ENGINE
                          out_r, out_c, src_r, src_c, rel_r, rel_c, center_row, center_col);
             end
             
+            // 첫 번째 블록의 경우 상세 디버깅
+            if (out_r <= 1 && out_c <= 1 && center_row == 1 && center_col == 1) begin
+                $display("[DEBUG] First block calc: out(%d,%d) -> src(%d,%d) -> rel(%d,%d) vs center(%d,%d)", 
+                         out_r, out_c, src_r, src_c, rel_r, rel_c, center_row, center_col);
+            end
+            
             // 3x3 버퍼 범위 내인지 확인
             if (rel_r >= -1 && rel_r <= 1 && rel_c >= -1 && rel_c <= 1) begin
                 // 버퍼 인덱스로 변환하여 값 가져오기
                 calc_output_value = buffer_3x3[(rel_r + 1) * 3 + (rel_c + 1)];
                 if (out_r >= width || out_c >= width) begin
                     $display("[DEBUG] Buffer access: index=%d, value=%d", (rel_r + 1) * 3 + (rel_c + 1), calc_output_value);
+                end
+                // 첫 번째 블록의 경우 상세 디버깅
+                if (out_r <= 1 && out_c <= 1 && center_row == 1 && center_col == 1) begin
+                    $display("[DEBUG] First block buffer: index=%d, value=%d", (rel_r + 1) * 3 + (rel_c + 1), calc_output_value);
                 end
             end else begin
                 // 범위를 벗어나면 0 반환 (오류 상황)
@@ -382,6 +401,15 @@ module MPDMAC_ENGINE
                     $display("  %d %d %d", buffer_3x3[0], buffer_3x3[1], buffer_3x3[2]);
                     $display("  %d %d %d", buffer_3x3[3], buffer_3x3[4], buffer_3x3[5]);
                     $display("  %d %d %d", buffer_3x3[6], buffer_3x3[7], buffer_3x3[8]);
+                    
+                    // 첫 번째 블록의 경우 상세 디버깅
+                    if (block_row == 0 && block_col == 0) begin
+                        $display("[DEBUG] First block output calculation:");
+                        $display("  TL(0,0) -> value=%d", calc_output_value(block_row, block_col, mat_width));
+                        $display("  TR(0,1) -> value=%d", calc_output_value(block_row, block_col + 1, mat_width));
+                        $display("  BL(1,0) -> value=%d", calc_output_value(block_row + 1, block_col, mat_width));
+                        $display("  BR(1,1) -> value=%d", calc_output_value(block_row + 1, block_col + 1, mat_width));
+                    end
                     
                     state <= S_WRITE_REQ;
                     write_count <= 2'd0;
