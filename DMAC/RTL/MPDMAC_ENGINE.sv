@@ -126,9 +126,8 @@ module MPDMAC_ENGINE
     wire write_data_available = 1'b1;  // 버퍼에서 항상 데이터 사용 가능
     
     // Helper signals  
-    wire next_block_x = (block_x == blocks_per_row - 1) ? 6'd0 : block_x + 1;
-    wire next_block_y = (block_x == blocks_per_row - 1) ? block_y + 1 : block_y;
-    wire all_blocks_done = (next_block_y >= blocks_per_col);
+    wire current_block_done = (block_x == blocks_per_row - 1) && (block_y == blocks_per_col - 1);
+    wire all_blocks_done = current_block_done;
     
     // Block type detection function
     function [3:0] detect_block_type;
@@ -449,14 +448,19 @@ module MPDMAC_ENGINE
                                 done_n = 1'b1;
                                 $display("[DEBUG] All blocks completed!");
                             end else begin
-                                // Move to next block immediately
-                                block_x_n = next_block_x;
-                                block_y_n = next_block_y;
+                                                                // Move to next block immediately (row-major order)
+                                 if (block_x == blocks_per_row - 1) begin
+                                     block_x_n = 6'd0;
+                                     block_y_n = block_y + 1;
+                                 end else begin
+                                     block_x_n = block_x + 1;
+                                     block_y_n = block_y;
+                                 end
                                 read_row_n = 2'd0;
-                                block_type_n = detect_block_type(next_block_x, next_block_y, blocks_per_row, blocks_per_col);
+                                block_type_n = detect_block_type(block_x_n, block_y_n, blocks_per_row, blocks_per_col);
                                 state_n = S_RREQ;
                                 $display("[DEBUG] Block (%d,%d) completed, moving to (%d,%d)", 
-                                        block_x, block_y, next_block_x, next_block_y);
+                                        block_x, block_y, block_x_n, block_y_n);
                             end
                         end else begin
                             // Wait for response in next state
@@ -471,10 +475,15 @@ module MPDMAC_ENGINE
                 if (b_handshake) begin
                     state_n = all_blocks_done ? S_IDLE : S_RREQ;
                     
-                    if (!all_blocks_done) begin
-                        // Move to next block
-                        block_x_n = next_block_x;
-                        block_y_n = next_block_y;
+                                        if (!all_blocks_done) begin
+                        // Move to next block (row-major order)
+                        if (block_x == blocks_per_row - 1) begin
+                            block_x_n = 6'd0;
+                            block_y_n = block_y + 1;
+                        end else begin
+                            block_x_n = block_x + 1;
+                            block_y_n = block_y;
+                        end
                         
                         read_row_n = 2'd0;
                         block_type_n = detect_block_type(block_x_n, block_y_n, blocks_per_row, blocks_per_col);
