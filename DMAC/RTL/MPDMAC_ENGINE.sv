@@ -267,7 +267,7 @@ module MPDMAC_ENGINE
                 TYPE_B:     get_base_x = 3'd0;
                 TYPE_L:     get_base_x = 3'd1;
                 TYPE_R:     get_base_x = 3'd0;
-                default:    get_base_x = 3'd1; // TYPE_INNER
+                default:    get_base_x = 3'd0; // TYPE_INNER
             endcase
         end
     endfunction
@@ -284,7 +284,7 @@ module MPDMAC_ENGINE
                 TYPE_B:     get_base_y = 3'd0;
                 TYPE_L:     get_base_y = 3'd0;
                 TYPE_R:     get_base_y = 3'd0;
-                default:    get_base_y = 3'd1; // TYPE_INNER
+                default:    get_base_y = 3'd0; // TYPE_INNER
             endcase
         end
     endfunction
