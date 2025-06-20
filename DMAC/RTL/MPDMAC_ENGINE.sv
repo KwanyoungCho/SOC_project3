@@ -144,6 +144,7 @@ module MPDMAC_ENGINE
         input signed [6:0] src_c;  // 0-based source col (can be negative or > width)
         input [5:0] width;
         reg [5:0] safe_r, safe_c;
+        reg [3:0] buf_r, buf_c;
         begin
             // Mirror padding logic for boundaries
             if (src_r < 0) begin
@@ -162,13 +163,25 @@ module MPDMAC_ENGINE
                 safe_c = src_c;  // Normal case
             end
             
-            // Get value from 4x4 buffer if it's within current block
-            if (safe_r >= block_row && safe_r < block_row + 4 && 
-                safe_c >= block_col && safe_c < block_col + 4) begin
-                get_src_value = src_buffer_4x4[(safe_r - block_row) * 4 + (safe_c - block_col)];
+            // Map to current 4x4 buffer coordinates
+            // For boundary cases, clamp to buffer edges
+            if (safe_r < block_row) begin
+                buf_r = 0;  // Use top row of buffer
+            end else if (safe_r >= block_row + 4) begin
+                buf_r = 3;  // Use bottom row of buffer
             end else begin
-                get_src_value = 32'd0;  // Should not happen with proper block reading
+                buf_r = safe_r - block_row;
             end
+            
+            if (safe_c < block_col) begin
+                buf_c = 0;  // Use left col of buffer
+            end else if (safe_c >= block_col + 4) begin
+                buf_c = 3;  // Use right col of buffer
+            end else begin
+                buf_c = safe_c - block_col;
+            end
+            
+            get_src_value = src_buffer_4x4[buf_r * 4 + buf_c];
         end
     endfunction
     
@@ -364,27 +377,41 @@ module MPDMAC_ENGINE
                         aw_valid <= 1'b0;
                         w_valid <= 1'b1;
                         b_ready <= 1'b1;
-                    end
-                    
-                    if (w_valid && wready_i) begin
-                        // Send data from 5x5 padded buffer
-                        // Output position (write_row, write_col) maps to padded buffer (write_row+1, write_col+1)
+                        
+                        // Set initial data and w_last for first beat
                         reg [4:0] padded_idx;
                         reg [2:0] write_col;
                         
-                        write_col = 3 - write_burst_count;  // 0, 1, 2, 3
-                        padded_idx = (write_row + 1) * 5 + (write_col + 1);  // +1 for padding offset
+                        write_col = 3 - write_burst_count;  // First beat: col = 0
+                        padded_idx = (write_row + 1) * 5 + (write_col + 1);
                         
                         w_data <= padded_buffer_5x5[padded_idx];
                         w_last <= (write_burst_count == 0);
                         
-                        $display("[DEBUG] Write DATA: row=%d col=%d data=%d (from padded[%d])", 
+                        $display("[DEBUG] Write DATA start: row=%d col=%d data=%d (from padded[%d])", 
                                  write_row, write_col, padded_buffer_5x5[padded_idx], padded_idx);
-                        
+                    end
+                    
+                    if (w_handshake) begin
                         write_burst_count <= write_burst_count - 1;
                         
-                        if (write_burst_count == 0) begin
+                        if (write_burst_count > 0) begin
+                            // More beats to send
+                            reg [4:0] next_padded_idx;
+                            reg [2:0] next_write_col;
+                            
+                            next_write_col = 3 - (write_burst_count - 1);
+                            next_padded_idx = (write_row + 1) * 5 + (next_write_col + 1);
+                            
+                            w_data <= padded_buffer_5x5[next_padded_idx];
+                            w_last <= (write_burst_count == 1);
+                            
+                            $display("[DEBUG] Write DATA cont: row=%d col=%d data=%d (from padded[%d])", 
+                                     write_row, next_write_col, padded_buffer_5x5[next_padded_idx], next_padded_idx);
+                        end else begin
+                            // Last beat sent
                             w_valid <= 1'b0;
+                            w_last <= 1'b0;
                         end
                     end
                     
