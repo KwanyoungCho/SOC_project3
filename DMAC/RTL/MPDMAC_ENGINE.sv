@@ -364,15 +364,14 @@ module MPDMAC_ENGINE
             
             S_RDATA: begin
                 rready = 1'b1;
-                if (rvalid_i) begin
-                    read_col_n = read_col + 1;
-                    
+                if (rvalid_i && rready_o) begin
                     $display("[DEBUG] Read DATA[%d,%d] = %d -> buffer[%d][%d]", 
                             read_row, read_col, rdata_i,
                             get_base_x(block_type) + read_col, get_base_y(block_type) + read_row);
                     
                     if (rlast_i) begin
                         // One row completed
+                        read_col_n = 2'd0;  // Reset column for next row
                         if (read_row == 2'd3) begin
                             // All 4 rows read, process padding
                             state_n = S_PROCESS;
@@ -381,6 +380,9 @@ module MPDMAC_ENGINE
                             read_row_n = read_row + 1;
                             state_n = S_RREQ;
                         end
+                    end else begin
+                        // Continue current row
+                        read_col_n = read_col + 1;
                     end
                 end
             end
@@ -414,7 +416,8 @@ module MPDMAC_ENGINE
                     
                     $display("[DEBUG] Write DATA[%d] = %d", write_cnt, wdata_o);
                     
-                    if (wlast_o) begin
+                    if (wlast_o && bvalid_i) begin
+                        // Write burst completed
                         // Move to next block
                         if (block_x == blocks_per_row - 1) begin
                             block_x_n = 6'd0;
@@ -427,6 +430,8 @@ module MPDMAC_ENGINE
                         block_type_n = detect_block_type(block_x_n, block_y_n, blocks_per_row, blocks_per_col);
                         
                         state_n = S_RREQ;
+                        $display("[DEBUG] Block (%d,%d) completed, moving to (%d,%d)", 
+                                block_x, block_y, block_x_n, block_y_n);
                     end
                 end
             end
@@ -434,14 +439,21 @@ module MPDMAC_ENGINE
     end
     
     // Buffer management in always_ff block
-    integer i, j;
+    integer i, j, k, l;
     always_ff @(posedge clk) begin
         if (!rst_n) begin
-            // Reset buffer (optional)
+            // Initialize buffer to zero
+            for (k = 0; k < 5; k = k + 1) begin
+                for (l = 0; l < 5; l = l + 1) begin
+                    buffer[k][l] <= 32'd0;
+                end
+            end
         end else begin
             // Store read data in buffer
-            if (state == S_RDATA && rvalid_i) begin
+            if (state == S_RDATA && rvalid_i && rready_o) begin
                 buffer[get_base_x(block_type) + read_col][get_base_y(block_type) + read_row] <= rdata_i;
+                $display("[DEBUG] Storing rdata=%d at buffer[%d][%d]", rdata_i, 
+                        get_base_x(block_type) + read_col, get_base_y(block_type) + read_row);
             end
             
             // Apply padding in S_PROCESS state
