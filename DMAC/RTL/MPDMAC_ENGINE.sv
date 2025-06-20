@@ -83,7 +83,8 @@ module MPDMAC_ENGINE
     
     // Read state variables
     reg [31:0] read_addr;
-    reg [1:0]  read_cnt;                 // 4개씩 읽으므로 0~3
+    reg [1:0]  read_cnt;                 // 읽고 있는 행 인덱스 (0~3)
+    reg [1:0]  read_col;                 // burst 내 컬럼 인덱스
     reg [3:0]  read_burst_cnt;
     
     // Write state variables  
@@ -147,6 +148,83 @@ module MPDMAC_ENGINE
             // Inner case
             else
                 detect_block_type = TYPE_INNER;
+        end
+    endfunction
+
+    // Apply padding to 5x5 buffer based on block type
+    task automatic apply_padding;
+        integer x;
+        integer y;
+        begin
+            case (block_type)
+                TYPE_TL: begin
+                    buffer[0][0] <= buffer[2][2];
+                    for (x = 0; x < 5; x++) buffer[x][0] <= buffer[x][2];
+                    for (y = 0; y < 5; y++) buffer[0][y] <= buffer[2][y];
+                end
+                TYPE_TR: begin
+                    for (x = 0; x < 5; x++) buffer[x][0] <= buffer[x][2];
+                    for (y = 0; y < 5; y++) buffer[4][y] <= buffer[2][y];
+                end
+                TYPE_BL: begin
+                    for (x = 0; x < 5; x++) buffer[x][4] <= buffer[x][2];
+                    for (y = 0; y < 5; y++) buffer[0][y] <= buffer[2][y];
+                end
+                TYPE_BR: begin
+                    for (x = 0; x < 5; x++) buffer[x][4] <= buffer[x][2];
+                    for (y = 0; y < 5; y++) buffer[4][y] <= buffer[2][y];
+                end
+                TYPE_T: begin
+                    for (x = 0; x < 5; x++) buffer[x][0] <= buffer[x][2];
+                end
+                TYPE_B: begin
+                    for (x = 0; x < 5; x++) buffer[x][4] <= buffer[x][2];
+                end
+                TYPE_L: begin
+                    for (y = 0; y < 5; y++) buffer[0][y] <= buffer[2][y];
+                end
+                TYPE_R: begin
+                    for (y = 0; y < 5; y++) buffer[4][y] <= buffer[2][y];
+                end
+                default: begin
+                    // TYPE_INNER : no padding
+                end
+            endcase
+        end
+    endtask
+
+    // Buffer base coordinate for each block type
+    function [1:0] base_x;
+        input [3:0] btype;
+        begin
+            case (btype)
+                TYPE_TL:    base_x = 2'd1;
+                TYPE_TR:    base_x = 2'd0;
+                TYPE_BL:    base_x = 2'd1;
+                TYPE_BR:    base_x = 2'd0;
+                TYPE_T:     base_x = 2'd0;
+                TYPE_B:     base_x = 2'd0;
+                TYPE_L:     base_x = 2'd1;
+                TYPE_R:     base_x = 2'd0;
+                default:    base_x = 2'd1; // TYPE_INNER
+            endcase
+        end
+    endfunction
+
+    function [1:0] base_y;
+        input [3:0] btype;
+        begin
+            case (btype)
+                TYPE_TL:    base_y = 2'd1;
+                TYPE_TR:    base_y = 2'd1;
+                TYPE_BL:    base_y = 2'd0;
+                TYPE_BR:    base_y = 2'd0;
+                TYPE_T:     base_y = 2'd1;
+                TYPE_B:     base_y = 2'd0;
+                TYPE_L:     base_y = 2'd0;
+                TYPE_R:     base_y = 2'd0;
+                default:    base_y = 2'd1; // TYPE_INNER
+            endcase
         end
     endfunction
     
@@ -279,6 +357,7 @@ module MPDMAC_ENGINE
             current_block <= 6'd0;
             read_addr <= 32'd0;
             read_cnt <= 2'd0;
+            read_col <= 2'd0;
             read_burst_cnt <= 4'd0;
             write_addr <= 32'd0;
             write_cnt <= 3'd0;
@@ -299,8 +378,11 @@ module MPDMAC_ENGINE
                         current_block <= 6'd0;
                         block_x <= 6'd0;
                         block_y <= 6'd0;
-                        
-                        $display("[DEBUG] Starting DMA: src=%h, dst=%h, width=%d", 
+                        read_addr <= calc_read_addr(6'd0, 6'd0, 2'd0, mat_width_i);
+                        block_type <= detect_block_type(6'd0, 6'd0, mat_width_i >> 2,
+                                                      (mat_width_i >> 2) * (mat_width_i >> 2));
+
+                        $display("[DEBUG] Starting DMA: src=%h, dst=%h, width=%d",
                                 src_addr_i, dst_addr_i, mat_width_i);
                         $display("[DEBUG] Blocks per row: %d, Total blocks: %d", 
                                 mat_width_i >> 2, (mat_width_i >> 2) * (mat_width_i >> 2));
@@ -314,6 +396,9 @@ module MPDMAC_ENGINE
                         state <= READ_DATA;
                         read_burst_cnt <= calc_arlen;
                         read_cnt <= 2'd0;
+                        read_col <= 2'd0;
+                        block_type <= detect_block_type(block_x, block_y,
+                                                  blocks_per_row, total_blocks);
                         
                         $display("[DEBUG] Read ADDR: block(%d,%d), addr=%h", 
                                 block_x, block_y, read_addr);
@@ -325,35 +410,37 @@ module MPDMAC_ENGINE
                 
                 READ_DATA: begin
                     if (r_handshake) begin
-                        // 4x4 블록을 버퍼에 저장 (타입에 따라 위치 조정)
-                        // 일단 기본 위치에 저장 (추후 padding 처리에서 조정)
-                        buffer[read_cnt][read_cnt] <= rdata_i;  // 임시 저장 위치
-                        read_cnt <= read_cnt + 1;
+                        buffer[base_x(block_type)+read_col][base_y(block_type)+read_cnt] <= rdata_i;
+                        read_col <= read_col + 1;
                         read_burst_cnt <= read_burst_cnt - 1;
-                        
-                        $display("[DEBUG] Read DATA[%d] = %d", read_cnt, rdata_i);
-                        
+
+                        $display("[DEBUG] Read DATA[%d,%d] = %d", read_cnt, read_col, rdata_i);
+
                         if (read_burst_complete) begin
-                            state <= PROCESS;
-                            // 블록 타입 결정
-                            block_type <= detect_block_type(block_x, block_y, blocks_per_row, total_blocks);
+                            read_col <= 2'd0;
+                            if (read_cnt == 2'd3) begin
+                                state <= PROCESS;
+                            end else begin
+                                read_cnt <= read_cnt + 1;
+                                read_addr <= calc_read_addr(block_x, block_y, read_cnt + 1, mat_width);
+                                state <= READ_ADDR;
+                            end
                         end
                     end
                 end
                 
                 PROCESS: begin
-                    // 여기서 padding 처리
-                    // 각 블록 타입에 따른 buffer 재배치 및 padding
-                    // (구현 필요)
-                    
+                    // 버퍼에 패딩 적용
+                    apply_padding();
+
                     $display("[DEBUG] Processing block type: %d", block_type);
-                    
+
                     // 처리 완료 후 쓰기 준비
                     write_addr <= calc_write_addr(block_x, block_y, 3'd0, mat_width, block_type);
                     write_cnt <= 3'd0;
                     write_burst_cnt <= calc_awlen;
                     output_data <= get_buffer_output(3'd0, block_type);
-                    
+
                     state <= WRITE_ADDR;
                 end
                 
