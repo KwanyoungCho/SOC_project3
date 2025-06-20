@@ -291,9 +291,9 @@ module DMAC_TOP_TB ();
         // end
         // $display("");
         
-        // src_addr        = 'h0000_0100;
-        // dst_addr        = 'h0000_A000;
-        // mat_width       = 16;
+        src_addr        = 'h0000_0100;
+        dst_addr        = 'h0000_A000;
+        mat_width       = 16;
         $display("===================================================");
         $display(" TestCase 2 | MAT_WIDTH = 16"); 
         $display("===================================================");
