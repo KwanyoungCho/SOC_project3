@@ -211,17 +211,17 @@ module MPDMAC_ENGINE
                 TYPE_TR: begin  
                     // TR: (bx*4+4, by*4)에서 시작
                     dst_row = by * 4 + wrow;
-                    dst_col = bx * 4 + 2;
+                    dst_col = bx * 4 + 1;
                 end
                 TYPE_BL: begin
                     // BL: (bx*4, by*4+4)에서 시작  
-                    dst_row = by * 4 + 2 + wrow;
+                    dst_row = by * 4 + 1 + wrow;
                     dst_col = bx * 4;
                 end
                 TYPE_BR: begin
                     // BR: (bx*4+4, by*4+4)에서 시작
-                    dst_row = by * 4 + 2 + wrow;
-                    dst_col = bx * 4 + 2;
+                    dst_row = by * 4 + 1 + wrow;
+                    dst_col = bx * 4 + 1;
                 end
                 TYPE_T: begin
                     // T: (1,0)에서 시작 (top padding)
