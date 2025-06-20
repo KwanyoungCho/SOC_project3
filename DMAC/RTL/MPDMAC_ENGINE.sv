@@ -56,25 +56,49 @@ module MPDMAC_ENGINE
     output  wire                        rready_o
 );
 
-    // State Machine - DMAC_ENGINE 패턴을 따라함
-    localparam S_IDLE  = 3'd0;
-    localparam S_RREQ  = 3'd1;
-    localparam S_RDATA = 3'd2;
-    localparam S_WREQ  = 3'd3;
-    localparam S_WDATA = 3'd4;
+    // State Machine - DMAC_ENGINE 패턴 + 블록 처리
+    localparam S_IDLE   = 4'd0;
+    localparam S_RREQ   = 4'd1;
+    localparam S_RDATA  = 4'd2;
+    localparam S_PROCESS = 4'd3;  // padding 처리
+    localparam S_WREQ   = 4'd4;
+    localparam S_WDATA  = 4'd5;
 
-    reg [2:0]               state, state_n;
+    reg [3:0]               state, state_n;
     
     // Configuration registers
     reg [31:0]              src_addr, src_addr_n;
     reg [31:0]              dst_addr, dst_addr_n;
     reg [5:0]               mat_width, mat_width_n;
     
-    // Processing variables
-    reg [5:0]               dst_row, dst_row_n;     // 현재 쓰고 있는 출력 행 (0~width+1)
-    reg [5:0]               dst_col, dst_col_n;     // 현재 쓰고 있는 출력 열 (0~width+1)
+    // Block processing variables
+    reg [5:0]               block_x, block_x_n;     // 현재 블록 x 좌표 (0 ~ blocks_per_row-1)
+    reg [5:0]               block_y, block_y_n;     // 현재 블록 y 좌표 (0 ~ blocks_per_col-1)
+    reg [5:0]               blocks_per_row, blocks_per_row_n;
+    reg [5:0]               blocks_per_col, blocks_per_col_n;
     
-    reg [31:0]              data_buf, data_buf_n;   // 읽어온 데이터 버퍼
+    // 5x5 Buffer (x,y 좌표로 접근)
+    reg [31:0]              buffer [0:4][0:4];      // buffer[x][y]
+    
+    // Burst read variables
+    reg [1:0]               read_row, read_row_n;   // 4x4 블록 내 읽고 있는 행 (0~3)
+    reg [1:0]               read_col, read_col_n;   // burst 내 읽고 있는 열 (0~3)
+    
+    // Burst write variables
+    reg [4:0]               write_cnt, write_cnt_n; // 출력 중인 데이터 개수 (최대 25개)
+    reg [4:0]               write_len, write_len_n; // 현재 블록의 출력 길이
+    
+    // Block type detection
+    reg [3:0]               block_type, block_type_n;
+    localparam TYPE_TL    = 4'd0;  // Top-Left corner
+    localparam TYPE_TR    = 4'd1;  // Top-Right corner  
+    localparam TYPE_BL    = 4'd2;  // Bottom-Left corner
+    localparam TYPE_BR    = 4'd3;  // Bottom-Right corner
+    localparam TYPE_T     = 4'd4;  // Top edge
+    localparam TYPE_B     = 4'd5;  // Bottom edge
+    localparam TYPE_L     = 4'd6;  // Left edge
+    localparam TYPE_R     = 4'd7;  // Right edge
+    localparam TYPE_INNER = 4'd8;  // Inner (no edge)
     
     // Control signals
     reg                     arvalid;
@@ -84,77 +108,214 @@ module MPDMAC_ENGINE
     reg                     done;
     
     // Helper signals
-    wire [5:0] out_width = mat_width + 2;
-    wire dst_complete = (dst_row >= mat_width + 2);
+    wire all_blocks_done = (block_y >= blocks_per_col);
     
-    // Mirror padding function - 출력 좌표에서 소스 좌표로 매핑
-    function [31:0] calc_src_addr_from_dst;
-        input [5:0] out_row, out_col;
-        input [5:0] width;
-        input [31:0] base_addr;
-        reg [5:0] src_row_mapped, src_col_mapped;
+    // Block type detection function
+    function [3:0] detect_block_type;
+        input [5:0] bx, by;
+        input [5:0] blocks_row, blocks_col;
         begin
-            // Mirror padding mapping
-            if (out_row == 0) begin
-                src_row_mapped = 1;  // 첫 번째 출력 행 -> 소스 1행
-            end else if (out_row == width + 1) begin
-                src_row_mapped = width - 2;  // 마지막 출력 행 -> 소스 width-2행
-            end else begin
-                src_row_mapped = out_row - 1;  // 나머지 -> 1칸씩 이동
-            end
-            
-            if (out_col == 0) begin
-                src_col_mapped = 1;  // 첫 번째 출력 열 -> 소스 1열
-            end else if (out_col == width + 1) begin
-                src_col_mapped = width - 2;  // 마지막 출력 열 -> 소스 width-2열
-            end else begin
-                src_col_mapped = out_col - 1;  // 나머지 -> 1칸씩 이동
-            end
-            
-            calc_src_addr_from_dst = base_addr + (src_row_mapped * width + src_col_mapped) * 4;
+            // Corner cases
+            if (bx == 0 && by == 0) 
+                detect_block_type = TYPE_TL;
+            else if (bx == blocks_row-1 && by == 0)
+                detect_block_type = TYPE_TR;
+            else if (bx == 0 && by == blocks_col-1)
+                detect_block_type = TYPE_BL;
+            else if (bx == blocks_row-1 && by == blocks_col-1)
+                detect_block_type = TYPE_BR;
+            // Edge cases
+            else if (by == 0)
+                detect_block_type = TYPE_T;
+            else if (by == blocks_col-1)
+                detect_block_type = TYPE_B;
+            else if (bx == 0)
+                detect_block_type = TYPE_L;
+            else if (bx == blocks_row-1)
+                detect_block_type = TYPE_R;
+            // Inner case
+            else
+                detect_block_type = TYPE_INNER;
         end
     endfunction
     
-    // Output address calculation
-    function [31:0] calc_dst_addr;
-        input [5:0] out_row, out_col;
+    // Calculate source read address
+    function [31:0] calc_read_addr;
+        input [5:0] bx, by;
+        input [1:0] row;
         input [5:0] width;
         input [31:0] base_addr;
+        reg [5:0] src_row, src_col;
         begin
-            calc_dst_addr = base_addr + (out_row * (width + 2) + out_col) * 4;
+            src_row = by * 4 + row;
+            src_col = bx * 4;
+            calc_read_addr = base_addr + (src_row * width + src_col) * 4;
+        end
+    endfunction
+    
+    // Calculate destination write address
+    function [31:0] calc_write_addr;
+        input [5:0] bx, by;
+        input [5:0] width;
+        input [31:0] base_addr;
+        input [3:0] btype;
+        reg [5:0] dst_row, dst_col;
+        begin
+            case (btype)
+                TYPE_TL, TYPE_TR, TYPE_BL, TYPE_BR: begin
+                    dst_row = by * 4;
+                    dst_col = bx * 4;
+                end
+                TYPE_T, TYPE_B: begin
+                    dst_row = by * 4;
+                    dst_col = bx * 4 + 1;
+                end
+                TYPE_L, TYPE_R: begin
+                    dst_row = by * 4 + 1;
+                    dst_col = bx * 4;
+                end
+                TYPE_INNER: begin
+                    dst_row = by * 4 + 1;
+                    dst_col = bx * 4 + 1;
+                end
+            endcase
+            calc_write_addr = base_addr + (dst_row * (width + 2) + dst_col) * 4;
+        end
+    endfunction
+    
+    // Get buffer base coordinates for storing read data
+    function [1:0] get_base_x;
+        input [3:0] btype;
+        begin
+            case (btype)
+                TYPE_TL:    get_base_x = 2'd1;
+                TYPE_TR:    get_base_x = 2'd0;
+                TYPE_BL:    get_base_x = 2'd1;
+                TYPE_BR:    get_base_x = 2'd0;
+                TYPE_T:     get_base_x = 2'd0;
+                TYPE_B:     get_base_x = 2'd0;
+                TYPE_L:     get_base_x = 2'd1;
+                TYPE_R:     get_base_x = 2'd0;
+                default:    get_base_x = 2'd1; // TYPE_INNER
+            endcase
+        end
+    endfunction
+    
+    function [1:0] get_base_y;
+        input [3:0] btype;
+        begin
+            case (btype)
+                TYPE_TL:    get_base_y = 2'd1;
+                TYPE_TR:    get_base_y = 2'd1;
+                TYPE_BL:    get_base_y = 2'd0;
+                TYPE_BR:    get_base_y = 2'd0;
+                TYPE_T:     get_base_y = 2'd1;
+                TYPE_B:     get_base_y = 2'd0;
+                TYPE_L:     get_base_y = 2'd0;
+                TYPE_R:     get_base_y = 2'd0;
+                default:    get_base_y = 2'd1; // TYPE_INNER
+            endcase
+        end
+    endfunction
+    
+    // Get output length for each block type
+    function [4:0] get_output_len;
+        input [3:0] btype;
+        begin
+            case (btype)
+                TYPE_TL, TYPE_TR, TYPE_BL, TYPE_BR: get_output_len = 5'd25;  // 5x5
+                TYPE_T, TYPE_B: get_output_len = 5'd20;                      // 5x4
+                TYPE_L, TYPE_R: get_output_len = 5'd20;                      // 4x5
+                TYPE_INNER: get_output_len = 5'd16;                          // 4x4
+                default: get_output_len = 5'd16;
+            endcase
+        end
+    endfunction
+    
+    // Get output data from buffer based on write counter
+    function [31:0] get_output_data;
+        input [4:0] cnt;
+        input [3:0] btype;
+        reg [2:0] buf_x, buf_y;
+        begin
+            case (btype)
+                TYPE_TL, TYPE_TR, TYPE_BL, TYPE_BR: begin
+                    // 5x5 전체 출력 (row-major order)
+                    buf_y = cnt / 5;
+                    buf_x = cnt % 5;
+                end
+                TYPE_T, TYPE_B: begin
+                    // 5x4 출력
+                    buf_y = cnt / 5;
+                    buf_x = cnt % 5;
+                end
+                TYPE_L, TYPE_R: begin
+                    // 4x5 출력
+                    buf_y = cnt / 4;
+                    buf_x = cnt % 4;
+                end
+                TYPE_INNER: begin
+                    // 4x4 출력 (패딩 제외)
+                    buf_y = cnt / 4 + 1;
+                    buf_x = cnt % 4 + 1;
+                end
+                default: begin
+                    buf_x = 0;
+                    buf_y = 0;
+                end
+            endcase
+            get_output_data = buffer[buf_x][buf_y];
         end
     endfunction
 
-    // Sequential logic - DMAC_ENGINE 패턴
+    // Sequential logic
     always_ff @(posedge clk) begin
         if (!rst_n) begin
             state <= S_IDLE;
             src_addr <= 32'd0;
             dst_addr <= 32'd0;
             mat_width <= 6'd0;
-            dst_row <= 6'd0;
-            dst_col <= 6'd0;
-            data_buf <= 32'd0;
+            block_x <= 6'd0;
+            block_y <= 6'd0;
+            blocks_per_row <= 6'd0;
+            blocks_per_col <= 6'd0;
+            read_row <= 2'd0;
+            read_col <= 2'd0;
+            write_cnt <= 5'd0;
+            write_len <= 5'd0;
+            block_type <= 4'd0;
         end else begin
             state <= state_n;
             src_addr <= src_addr_n;
             dst_addr <= dst_addr_n;
             mat_width <= mat_width_n;
-            dst_row <= dst_row_n;
-            dst_col <= dst_col_n;
-            data_buf <= data_buf_n;
+            block_x <= block_x_n;
+            block_y <= block_y_n;
+            blocks_per_row <= blocks_per_row_n;
+            blocks_per_col <= blocks_per_col_n;
+            read_row <= read_row_n;
+            read_col <= read_col_n;
+            write_cnt <= write_cnt_n;
+            write_len <= write_len_n;
+            block_type <= block_type_n;
         end
     end
 
-    // Combinational logic - DMAC_ENGINE 패턴
+    // Combinational logic
     always_comb begin
         state_n = state;
         src_addr_n = src_addr;
         dst_addr_n = dst_addr;
         mat_width_n = mat_width;
-        dst_row_n = dst_row;
-        dst_col_n = dst_col;
-        data_buf_n = data_buf;
+        block_x_n = block_x;
+        block_y_n = block_y;
+        blocks_per_row_n = blocks_per_row;
+        blocks_per_col_n = blocks_per_col;
+        read_row_n = read_row;
+        read_col_n = read_col;
+        write_cnt_n = write_cnt;
+        write_len_n = write_len;
+        block_type_n = block_type;
         
         arvalid = 1'b0;
         rready = 1'b0;
@@ -169,34 +330,73 @@ module MPDMAC_ENGINE
                     src_addr_n = src_addr_i;
                     dst_addr_n = dst_addr_i;
                     mat_width_n = mat_width_i;
-                    dst_row_n = 6'd0;
-                    dst_col_n = 6'd0;
+                    block_x_n = 6'd0;
+                    block_y_n = 6'd0;
+                    blocks_per_row_n = mat_width_i >> 2;  // /4
+                    blocks_per_col_n = mat_width_i >> 2;  // /4
+                    read_row_n = 2'd0;
+                    read_col_n = 2'd0;
+                    block_type_n = detect_block_type(6'd0, 6'd0, mat_width_i >> 2, mat_width_i >> 2);
                     
                     $display("[DEBUG] Starting DMA: src=%h, dst=%h, width=%d", 
                             src_addr_i, dst_addr_i, mat_width_i);
+                    $display("[DEBUG] Blocks: %dx%d", mat_width_i >> 2, mat_width_i >> 2);
                     
                     state_n = S_RREQ;
                 end
             end
             
             S_RREQ: begin
-                arvalid = 1'b1;
-                if (arready_i) begin
-                    state_n = S_RDATA;
-                    
-                    $display("[DEBUG] Read REQ: dst_pos(%d,%d) -> src_addr=%h", 
-                            dst_row, dst_col, calc_src_addr_from_dst(dst_row, dst_col, mat_width, src_addr));
+                if (!all_blocks_done) begin
+                    arvalid = 1'b1;
+                    if (arready_i) begin
+                        state_n = S_RDATA;
+                        read_col_n = 2'd0;
+                        
+                        $display("[DEBUG] Read REQ: block(%d,%d), row=%d, addr=%h", 
+                                block_x, block_y, read_row, araddr_o);
+                    end
+                end else begin
+                    state_n = S_IDLE;
+                    $display("[DEBUG] All blocks completed!");
                 end
             end
             
             S_RDATA: begin
                 rready = 1'b1;
                 if (rvalid_i) begin
-                    data_buf_n = rdata_i;
-                    state_n = S_WREQ;
+                    // Store data in buffer at correct position
+                    buffer[get_base_x(block_type) + read_col][get_base_y(block_type) + read_row] = rdata_i;
+                    read_col_n = read_col + 1;
                     
-                    $display("[DEBUG] Read DATA: %d", rdata_i);
+                    $display("[DEBUG] Read DATA[%d,%d] = %d -> buffer[%d][%d]", 
+                            read_row, read_col, rdata_i,
+                            get_base_x(block_type) + read_col, get_base_y(block_type) + read_row);
+                    
+                    if (rlast_i) begin
+                        // One row completed
+                        if (read_row == 2'd3) begin
+                            // All 4 rows read, process padding
+                            state_n = S_PROCESS;
+                        end else begin
+                            // Read next row
+                            read_row_n = read_row + 1;
+                            state_n = S_RREQ;
+                        end
+                    end
                 end
+            end
+            
+            S_PROCESS: begin
+                // Apply padding based on block type
+                // (padding logic will be implemented using non-blocking assignments)
+                
+                write_cnt_n = 5'd0;
+                write_len_n = get_output_len(block_type);
+                
+                $display("[DEBUG] Processing block type %d, output_len=%d", block_type, get_output_len(block_type));
+                
+                state_n = S_WREQ;
             end
             
             S_WREQ: begin
@@ -204,60 +404,109 @@ module MPDMAC_ENGINE
                 if (awready_i) begin
                     state_n = S_WDATA;
                     
-                    $display("[DEBUG] Write REQ: dst_pos(%d,%d) -> dst_addr=%h", 
-                            dst_row, dst_col, calc_dst_addr(dst_row, dst_col, mat_width, dst_addr));
+                    $display("[DEBUG] Write REQ: block(%d,%d), len=%d, addr=%h", 
+                            block_x, block_y, write_len-1, awaddr_o);
                 end
             end
             
             S_WDATA: begin
                 wvalid = 1'b1;
                 if (wready_i) begin
-                    $display("[DEBUG] Write DATA: pos(%d,%d) = %d", 
-                            dst_row, dst_col, data_buf);
+                    write_cnt_n = write_cnt + 1;
                     
-                    // 다음 위치로 이동
-                    if (dst_col == out_width - 1) begin
-                        dst_col_n = 6'd0;
-                        dst_row_n = dst_row + 1;
-                    end else begin
-                        dst_col_n = dst_col + 1;
-                    end
+                    $display("[DEBUG] Write DATA[%d] = %d", write_cnt, wdata_o);
                     
-                    // 완료 체크
-                    if (dst_complete) begin
-                        state_n = S_IDLE;
-                        $display("[DEBUG] DMA Complete!");
-                    end else begin
+                    if (wlast_o) begin
+                        // Move to next block
+                        if (block_x == blocks_per_row - 1) begin
+                            block_x_n = 6'd0;
+                            block_y_n = block_y + 1;
+                        end else begin
+                            block_x_n = block_x + 1;
+                        end
+                        
+                        read_row_n = 2'd0;
+                        block_type_n = detect_block_type(block_x_n, block_y_n, blocks_per_row, blocks_per_col);
+                        
                         state_n = S_RREQ;
                     end
                 end
             end
         endcase
     end
+    
+    // Apply padding in S_PROCESS state
+    integer i, j;
+    always_ff @(posedge clk) begin
+        if (state == S_PROCESS) begin
+            case (block_type)
+                TYPE_TL: begin
+                    // TL: (1,1) 기준으로 4x4 저장됨, padding 적용
+                    buffer[0][0] <= buffer[2][2];  // corner
+                    for (i = 0; i < 5; i = i + 1) buffer[i][0] <= buffer[i][2];  // top row
+                    for (j = 0; j < 5; j = j + 1) buffer[0][j] <= buffer[2][j];  // left col
+                end
+                TYPE_TR: begin
+                    // TR: (0,1) 기준으로 4x4 저장됨
+                    for (i = 0; i < 5; i = i + 1) buffer[i][0] <= buffer[i][2];  // top row
+                    for (j = 0; j < 5; j = j + 1) buffer[4][j] <= buffer[2][j];  // right col
+                end
+                TYPE_BL: begin
+                    // BL: (1,0) 기준으로 4x4 저장됨
+                    for (i = 0; i < 5; i = i + 1) buffer[i][4] <= buffer[i][2];  // bottom row
+                    for (j = 0; j < 5; j = j + 1) buffer[0][j] <= buffer[2][j];  // left col
+                end
+                TYPE_BR: begin
+                    // BR: (0,0) 기준으로 4x4 저장됨
+                    for (i = 0; i < 5; i = i + 1) buffer[i][4] <= buffer[i][2];  // bottom row
+                    for (j = 0; j < 5; j = j + 1) buffer[4][j] <= buffer[2][j];  // right col
+                end
+                TYPE_T: begin
+                    // T: (0,1) 기준으로 4x4 저장됨, top padding만
+                    for (i = 0; i < 5; i = i + 1) buffer[i][0] <= buffer[i][2];  // top row
+                end
+                TYPE_B: begin
+                    // B: (0,0) 기준으로 4x4 저장됨, bottom padding만
+                    for (i = 0; i < 5; i = i + 1) buffer[i][4] <= buffer[i][2];  // bottom row
+                end
+                TYPE_L: begin
+                    // L: (1,0) 기준으로 4x4 저장됨, left padding만
+                    for (j = 0; j < 5; j = j + 1) buffer[0][j] <= buffer[2][j];  // left col
+                end
+                TYPE_R: begin
+                    // R: (0,0) 기준으로 4x4 저장됨, right padding만
+                    for (j = 0; j < 5; j = j + 1) buffer[4][j] <= buffer[2][j];  // right col
+                end
+                TYPE_INNER: begin
+                    // INNER: (1,1) 기준으로 4x4 저장됨, padding 없음
+                end
+            endcase
+        end
+    end
 
-    // Output assignments - DMAC_ENGINE 패턴과 동일
+    // Output assignments
     assign done_o = done;
 
     assign awid_o = 4'd0;
-    assign awaddr_o = calc_dst_addr(dst_row, dst_col, mat_width, dst_addr);
-    assign awlen_o = 4'd0;      // 1-burst
-    assign awsize_o = 3'b010;   // 4 bytes per transfer
-    assign awburst_o = 2'b01;   // incremental
+    assign awaddr_o = calc_write_addr(block_x, block_y, mat_width, dst_addr, block_type);
+    assign awlen_o = write_len - 1;   // burst length
+    assign awsize_o = 3'b010;         // 4 bytes per transfer
+    assign awburst_o = 2'b01;         // incremental
     assign awvalid_o = awvalid;
 
     assign wid_o = 4'd0;
-    assign wdata_o = data_buf;
-    assign wstrb_o = 4'b1111;   // all bytes valid
-    assign wlast_o = 1'b1;      // single beat
+    assign wdata_o = get_output_data(write_cnt, block_type);
+    assign wstrb_o = 4'b1111;         // all bytes valid
+    assign wlast_o = (write_cnt == write_len - 1);
     assign wvalid_o = wvalid;
 
-    assign bready_o = 1'b1;     // always ready for response
+    assign bready_o = 1'b1;           // always ready for response
 
     assign arid_o = 4'd0;
-    assign araddr_o = calc_src_addr_from_dst(dst_row, dst_col, mat_width, src_addr);
-    assign arlen_o = 4'd0;      // 1-burst
-    assign arsize_o = 3'b010;   // 4 bytes per transfer  
-    assign arburst_o = 2'b01;   // incremental
+    assign araddr_o = calc_read_addr(block_x, block_y, read_row, mat_width, src_addr);
+    assign arlen_o = 4'd3;            // 4-beat burst (0~3)
+    assign arsize_o = 3'b010;         // 4 bytes per transfer
+    assign arburst_o = 2'b01;         // incremental
     assign arvalid_o = arvalid;
 
     assign rready_o = rready;
