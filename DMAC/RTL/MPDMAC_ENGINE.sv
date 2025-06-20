@@ -91,6 +91,14 @@ module MPDMAC_ENGINE
     reg [3:0]  write_burst_count; // 0-3 for each row burst
     reg [1:0]  write_row;      // Current row being written (0-3)
     
+    // Temporary variables for calculations
+    reg [31:0] row_addr;
+    reg [5:0]  current_src_row, output_row;
+    reg [4:0]  padded_idx, next_padded_idx;
+    reg [2:0]  write_col, next_write_col;
+    reg [31:0] write_addr;
+    reg [3:0]  buf_idx;
+    
     // AXI control signals
     reg        ar_valid;
     reg [31:0] ar_addr;
@@ -269,9 +277,6 @@ module MPDMAC_ENGINE
                 S_READ_REQ: begin
                     if (!ar_valid && (read_row < 4)) begin
                         // Read one row (4 elements) at a time
-                        reg [31:0] row_addr;
-                        reg [5:0] current_src_row;
-                        
                         current_src_row = block_row + read_row;
                         
                         // Check bounds and apply mirror padding for address calculation
@@ -312,7 +317,6 @@ module MPDMAC_ENGINE
                     
                     if (r_handshake) begin
                         // Store data in 4x4 buffer
-                        reg [3:0] buf_idx;
                         buf_idx = read_row * 4 + (3 - burst_count);  // burst_count: 3,2,1,0 → col: 0,1,2,3
                         
                         src_buffer_4x4[buf_idx] <= rdata_i;
@@ -352,9 +356,6 @@ module MPDMAC_ENGINE
                 S_WRITE_REQ: begin
                     if (!aw_valid && (write_row < 4)) begin
                         // Write one row (4 elements) at a time to output matrix
-                        reg [31:0] write_addr;
-                        reg [5:0] output_row;
-                        
                         output_row = block_row + write_row;
                         write_addr = calc_output_addr(output_row, block_col, mat_width);
                         
@@ -379,9 +380,6 @@ module MPDMAC_ENGINE
                         b_ready <= 1'b1;
                         
                         // Set initial data and w_last for first beat
-                        reg [4:0] padded_idx;
-                        reg [2:0] write_col;
-                        
                         write_col = 3 - write_burst_count;  // First beat: col = 0
                         padded_idx = (write_row + 1) * 5 + (write_col + 1);
                         
@@ -397,9 +395,6 @@ module MPDMAC_ENGINE
                         
                         if (write_burst_count > 0) begin
                             // More beats to send
-                            reg [4:0] next_padded_idx;
-                            reg [2:0] next_write_col;
-                            
                             next_write_col = 3 - (write_burst_count - 1);
                             next_padded_idx = (write_row + 1) * 5 + (next_write_col + 1);
                             
