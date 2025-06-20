@@ -105,7 +105,7 @@ module MPDMAC_ENGINE
     reg                     rready;
     reg                     awvalid;
     reg                     wvalid;
-    reg                     done;
+    reg                     done, done_n;
     
     // SGDMAC handshake patterns
     wire ar_handshake = arvalid_o & arready_i;
@@ -299,6 +299,7 @@ module MPDMAC_ENGINE
             write_cnt <= 5'd0;
             write_len <= 5'd0;
             block_type <= 4'd0;
+            done <= 1'b1;
         end else begin
             state <= state_n;
             src_addr <= src_addr_n;
@@ -313,6 +314,7 @@ module MPDMAC_ENGINE
             write_cnt <= write_cnt_n;
             write_len <= write_len_n;
             block_type <= block_type_n;
+            done <= done_n;
         end
     end
 
@@ -331,17 +333,18 @@ module MPDMAC_ENGINE
         write_cnt_n = write_cnt;
         write_len_n = write_len;
         block_type_n = block_type;
+        done_n = done;
         
         arvalid = 1'b0;
         rready = 1'b0;
         awvalid = 1'b0;
         wvalid = 1'b0;
-        done = 1'b0;
 
         case (state)
             S_IDLE: begin
-                done = 1'b1;
+                done_n = 1'b1;
                 if (start_i && mat_width_i != 0) begin
+                    done_n = 1'b0;
                     src_addr_n = src_addr_i;
                     dst_addr_n = dst_addr_i;
                     mat_width_n = mat_width_i;
