@@ -118,14 +118,14 @@ module MPDMAC_ENGINE
     wire is_last_write_beat = (write_burst_cnt == 4'd0);
     wire all_blocks_done = (current_block >= total_blocks);
     
-    // Block type detection function
+    // Block type detection function - 매트릭스 크기 기반 동적 판단
     function [3:0] detect_block_type;
         input [5:0] bx, by;           // block coordinates
-        input [5:0] blocks_per_row;
-        input [5:0] total_blocks;
-        reg [5:0] blocks_per_col;
+        input [5:0] mat_width;        // 실제 매트릭스 크기 (8, 16, 32)
+        reg [5:0] blocks_per_row, blocks_per_col;
         begin
-            blocks_per_col = total_blocks / blocks_per_row;
+            blocks_per_row = mat_width >> 2;  // mat_width / 4
+            blocks_per_col = mat_width >> 2;  // mat_width / 4
             
             // Corner cases
             if (bx == 0 && by == 0) 
@@ -228,16 +228,16 @@ module MPDMAC_ENGINE
         end
     endfunction
     
-    // Calculate source address for 4x4 block read
+    // Calculate source address for 4x4 block read - 각 행별로 읽기
     function [31:0] calc_read_addr;
         input [5:0] bx, by;
-        input [1:0] read_idx;    // 0~3 (4번의 읽기)
+        input [1:0] row_idx;    // 0~3 (블록 내 행 인덱스)
         input [5:0] width;
         reg [5:0] src_row, src_col;
         begin
             // 4x4 블록의 시작 좌표
-            src_row = by * 4 + read_idx;  // 각 읽기마다 다음 행
-            src_col = bx * 4;             // 블록의 시작 열
+            src_row = by * 4 + row_idx;  // 블록 시작 행 + 행 오프셋
+            src_col = bx * 4;            // 블록의 시작 열
             
             calc_read_addr = src_addr + (src_row * width + src_col) * 4;
         end
@@ -278,29 +278,37 @@ module MPDMAC_ENGINE
         end
     endfunction
     
-    // Get buffer value for output
+    // Get buffer value for output - 실제 출력할 데이터 선택
     function [31:0] get_buffer_output;
-        input [2:0] write_idx;
+        input [2:0] write_idx;  // 현재 출력 인덱스 (0~4)
         input [3:0] btype;
         reg [2:0] buf_x, buf_y;
         begin
-            // 블록 타입에 따른 버퍼 읽기 위치 결정
+            // 블록 타입에 따른 버퍼 읽기 위치 결정 (5x5 버퍼에서)
             case (btype)
                 TYPE_TL, TYPE_TR, TYPE_BL, TYPE_BR: begin
-                    buf_y = write_idx;
-                    buf_x = 0;  // 첫 번째 열부터 5개
+                    // 코너: 5x5 전체 출력 (row 기준으로 순차 출력)
+                    buf_y = write_idx / 5;     // 행 인덱스
+                    buf_x = write_idx % 5;     // 열 인덱스
                 end
                 TYPE_T, TYPE_B: begin
-                    buf_y = write_idx; 
-                    buf_x = 0;  // 5개 중 가운데 4개 (나중에 조정)
+                    // 상하 가장자리: 5x4 출력 (가로 5개, 세로 4개)
+                    buf_y = write_idx / 5;
+                    buf_x = write_idx % 5;
                 end
                 TYPE_L, TYPE_R: begin
-                    buf_y = write_idx;
-                    buf_x = 0;  // 5개 열 모두
+                    // 좌우 가장자리: 4x5 출력 (가로 4개, 세로 5개)
+                    buf_y = write_idx / 4;
+                    buf_x = write_idx % 4;
                 end
                 TYPE_INNER: begin
-                    buf_y = write_idx + 1;  // 패딩 제외한 4x4
-                    buf_x = 1;
+                    // 내부: 4x4 출력 (패딩 없이 원본 데이터만)
+                    buf_y = write_idx / 4 + 1;  // 1~4 행
+                    buf_x = write_idx % 4 + 1;  // 1~4 열
+                end
+                default: begin
+                    buf_x = 0;
+                    buf_y = 0;
                 end
             endcase
             
@@ -310,8 +318,22 @@ module MPDMAC_ENGINE
     
     // Calculate burst length
     wire [3:0] calc_arlen = 4'd3;     // 항상 4개씩 읽기 (0~3)
-    wire [3:0] calc_awlen = (block_type == TYPE_T || block_type == TYPE_B) ? 4'd3 : 
-                           (block_type == TYPE_INNER) ? 4'd3 : 4'd4;  // 타입에 따라 4 or 5개
+    
+    // 블록 타입에 따른 출력 버스트 길이 계산
+    function [3:0] calc_awlen_func;
+        input [3:0] btype;
+        begin
+            case (btype)
+                TYPE_TL, TYPE_TR, TYPE_BL, TYPE_BR: calc_awlen_func = 4'd24;  // 5x5 = 25개 (0~24)
+                TYPE_T, TYPE_B: calc_awlen_func = 4'd19;                      // 5x4 = 20개 (0~19)  
+                TYPE_L, TYPE_R: calc_awlen_func = 4'd19;                      // 4x5 = 20개 (0~19)
+                TYPE_INNER: calc_awlen_func = 4'd15;                          // 4x4 = 16개 (0~15)
+                default: calc_awlen_func = 4'd15;
+            endcase
+        end
+    endfunction
+    
+    wire [3:0] calc_awlen = calc_awlen_func(block_type);
     
     // AXI Output assignments
     assign done_o = (state == IDLE) && !start_i;
@@ -379,8 +401,7 @@ module MPDMAC_ENGINE
                         block_x <= 6'd0;
                         block_y <= 6'd0;
                         read_addr <= calc_read_addr(6'd0, 6'd0, 2'd0, mat_width_i);
-                        block_type <= detect_block_type(6'd0, 6'd0, mat_width_i >> 2,
-                                                      (mat_width_i >> 2) * (mat_width_i >> 2));
+                        block_type <= detect_block_type(6'd0, 6'd0, mat_width_i);
 
                         $display("[DEBUG] Starting DMA: src=%h, dst=%h, width=%d",
                                 src_addr_i, dst_addr_i, mat_width_i);
@@ -392,17 +413,17 @@ module MPDMAC_ENGINE
                 end
                 
                 READ_ADDR: begin
-                    if (!all_blocks_done && ar_handshake) begin
+                    if (current_block < total_blocks && ar_handshake) begin
                         state <= READ_DATA;
                         read_burst_cnt <= calc_arlen;
-                        read_cnt <= 2'd0;
                         read_col <= 2'd0;
-                        block_type <= detect_block_type(block_x, block_y,
-                                                  blocks_per_row, total_blocks);
                         
-                        $display("[DEBUG] Read ADDR: block(%d,%d), addr=%h", 
-                                block_x, block_y, read_addr);
-                    end else if (all_blocks_done) begin
+                        // 현재 블록의 타입을 동적으로 결정
+                        block_type <= detect_block_type(block_x, block_y, mat_width);
+                        
+                        $display("[DEBUG] Read ADDR: block(%d,%d), row=%d, addr=%h, type=%d", 
+                                block_x, block_y, read_cnt, read_addr, detect_block_type(block_x, block_y, mat_width));
+                    end else if (current_block >= total_blocks) begin
                         state <= IDLE;
                         $display("[DEBUG] All blocks completed!");
                     end
@@ -477,11 +498,23 @@ module MPDMAC_ENGINE
                                     block_x <= block_x + 1;
                                 end
                                 
-                                if (!all_blocks_done) begin
-                                    read_addr <= calc_read_addr(block_x, block_y, 2'd0, mat_width);
+                                if (current_block + 1 < total_blocks) begin
+                                    // 다음 블록 정보 계산
+                                    reg [5:0] next_bx, next_by;
+                                    if (block_x == blocks_per_row - 1) begin
+                                        next_bx = 6'd0;
+                                        next_by = block_y + 1;
+                                    end else begin
+                                        next_bx = block_x + 1;
+                                        next_by = block_y;
+                                    end
+                                    
+                                    read_addr <= calc_read_addr(next_bx, next_by, 2'd0, mat_width);
+                                    read_cnt <= 2'd0;
                                     state <= READ_ADDR;
                                 end else begin
                                     state <= IDLE;
+                                    $display("[DEBUG] All blocks completed!");
                                 end
                             end else begin
                                 state <= WRITE_RESP;
@@ -502,11 +535,23 @@ module MPDMAC_ENGINE
                             block_x <= block_x + 1;
                         end
                         
-                        if (!all_blocks_done) begin
-                            read_addr <= calc_read_addr(block_x, block_y, 2'd0, mat_width);
+                        if (current_block + 1 < total_blocks) begin
+                            // 다음 블록 정보 계산
+                            reg [5:0] next_bx, next_by;
+                            if (block_x == blocks_per_row - 1) begin
+                                next_bx = 6'd0;
+                                next_by = block_y + 1;
+                            end else begin
+                                next_bx = block_x + 1;
+                                next_by = block_y;
+                            end
+                            
+                            read_addr <= calc_read_addr(next_bx, next_by, 2'd0, mat_width);
+                            read_cnt <= 2'd0;
                             state <= READ_ADDR;
                         end else begin
                             state <= IDLE;
+                            $display("[DEBUG] All blocks completed!");
                         end
                     end
                 end
