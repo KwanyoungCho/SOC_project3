@@ -11,6 +11,7 @@
 [DEBUG] Storing rdata=      1545 at buffer[3][1]
 [DEBUG] Read DATA[0,3] =       1545 -> buffer[4][1]
 [DEBUG] Read DATA[0,3] =       1635 -> buffer[4][1]
+[DEBUG] Read DATA[0,3] =       1635 -> buffer[4][1]
 [DEBUG] Storing rdata=      1635 at buffer[4][1]
 [DEBUG] Read REQ: block( 0, 0), type=TL, row=1, addr=00000020
 [DEBUG] Read DATA[1,0] =        769 -> buffer[1][2]
@@ -22,6 +23,7 @@
 [DEBUG] Read DATA[1,2] =        374 -> buffer[3][2]
 [DEBUG] Storing rdata=       374 at buffer[3][2]
 [DEBUG] Read DATA[1,3] =        374 -> buffer[4][2]
+[DEBUG] Read DATA[1,3] =       3389 -> buffer[4][2]
 [DEBUG] Read DATA[1,3] =       3389 -> buffer[4][2]
 [DEBUG] Storing rdata=      3389 at buffer[4][2]
 [DEBUG] Read REQ: block( 0, 0), type=TL, row=2, addr=00000040
@@ -35,6 +37,7 @@
 [DEBUG] Storing rdata=      2021 at buffer[3][3]
 [DEBUG] Read DATA[2,3] =       2021 -> buffer[4][3]
 [DEBUG] Read DATA[2,3] =        631 -> buffer[4][3]
+[DEBUG] Read DATA[2,3] =        631 -> buffer[4][3]
 [DEBUG] Storing rdata=       631 at buffer[4][3]
 [DEBUG] Read REQ: block( 0, 0), type=TL, row=3, addr=00000060
 [DEBUG] Read DATA[3,0] =       2792 -> buffer[1][4]
@@ -47,6 +50,7 @@
 [DEBUG] Storing rdata=      2396 at buffer[3][4]
 [DEBUG] Read DATA[3,3] =       2396 -> buffer[4][4]
 [DEBUG] Read DATA[3,3] =       2237 -> buffer[4][4]
+[DEBUG] Read DATA[3,3] =       2237 -> buffer[4][4]
 [DEBUG] Storing rdata=      2237 at buffer[4][4]
 [DEBUG] Processing block type  0, total_rows=5
 [DEBUG] Starting row 0, len=5, awlen will be          4
@@ -55,8 +59,10 @@
 [DEBUG] Processing block type  0, total_rows=5
 [DEBUG] Starting row 0, len=5, awlen will be          4
 [DEBUG] TL padding: corner buffer[0][0]=      3341 from buffer[2][2]
+[DEBUG] TL padding values: [1][0]=       769, [2][0]=      3341, [3][0]=       374, [4][0]=      3389
 [DEBUG] Write REQ: block( 0, 0), type=TL, row=0, len= 4, addr=00000a00
 [DEBUG] write_len= 5, awlen_o= 4, burst_cnt_n= 4
+[DEBUG] Buffer row 0: [0]=      3341, [1]=       769, [2]=      3341, [3]=       374, [4]=      3389
 [DEBUG] Write DATA[ 0] =          x (from buffer[ 0][0])
 [DEBUG] Write DATA[ 1] =          x (from buffer[ 1][0])
 [DEBUG] Write DATA[ 1] =        769 (from buffer[ 1][0])
@@ -69,6 +75,7 @@
 [DEBUG] Row 0 completed, moving to row          1
 [DEBUG] Write REQ: block( 0, 0), type=TL, row=1, len= 4, addr=00000a28
 [DEBUG] write_len= 5, awlen_o= 4, burst_cnt_n= 4
+[DEBUG] Buffer row 1: [0]=      3713, [1]=      1316, [2]=      3713, [3]=      1545, [4]=      1635
 [DEBUG] Write DATA[ 0] =       3713 (from buffer[ 0][1])
 [DEBUG] Write DATA[ 1] =       3713 (from buffer[ 1][1])
 [DEBUG] Write DATA[ 1] =       1316 (from buffer[ 1][1])
@@ -81,6 +88,7 @@
 [DEBUG] Row 1 completed, moving to row          2
 [DEBUG] Write REQ: block( 0, 0), type=TL, row=2, len= 4, addr=00000a50
 [DEBUG] write_len= 5, awlen_o= 4, burst_cnt_n= 4
+[DEBUG] Buffer row 2: [0]=      3341, [1]=       769, [2]=      3341, [3]=       374, [4]=      3389
 [DEBUG] Write DATA[ 0] =       3341 (from buffer[ 0][2])
 [DEBUG] Write DATA[ 1] =       3341 (from buffer[ 1][2])
 [DEBUG] Write DATA[ 1] =        769 (from buffer[ 1][2])
@@ -93,6 +101,7 @@
 [DEBUG] Row 2 completed, moving to row          3
 [DEBUG] Write REQ: block( 0, 0), type=TL, row=3, len= 4, addr=00000a78
 [DEBUG] write_len= 5, awlen_o= 4, burst_cnt_n= 4
+[DEBUG] Buffer row 3: [0]=       682, [1]=      1221, [2]=       682, [3]=      2021, [4]=       631
 [DEBUG] Write DATA[ 0] =        682 (from buffer[ 0][3])
 [DEBUG] Write DATA[ 1] =        682 (from buffer[ 1][3])
 [DEBUG] Write DATA[ 1] =       1221 (from buffer[ 1][3])
@@ -105,6 +114,7 @@
 [DEBUG] Row 3 completed, moving to row          4
 [DEBUG] Write REQ: block( 0, 0), type=TL, row=4, len= 4, addr=00000aa0
 [DEBUG] write_len= 5, awlen_o= 4, burst_cnt_n= 4
+[DEBUG] Buffer row 4: [0]=      3781, [1]=      2792, [2]=      3781, [3]=      2396, [4]=      2237
 [DEBUG] Write DATA[ 0] =       3781 (from buffer[ 0][4])
 [DEBUG] Write DATA[ 1] =       3781 (from buffer[ 1][4])
 [DEBUG] Write DATA[ 1] =       2792 (from buffer[ 1][4])
@@ -126,6 +136,7 @@
 [DEBUG] Storing rdata=      1125 at buffer[2][1]
 [DEBUG] Read DATA[0,3] =       1125 -> buffer[3][1]
 [DEBUG] Read DATA[0,3] =        530 -> buffer[3][1]
+[DEBUG] Read DATA[0,3] =        530 -> buffer[3][1]
 [DEBUG] Storing rdata=       530 at buffer[3][1]
 [DEBUG] Read REQ: block( 1, 0), type=TR, row=1, addr=00000030
 [DEBUG] Read DATA[1,0] =       2029 -> buffer[0][2]
@@ -137,6 +148,7 @@
 [DEBUG] Read DATA[1,2] =       2553 -> buffer[2][2]
 [DEBUG] Storing rdata=      2553 at buffer[2][2]
 [DEBUG] Read DATA[1,3] =       2553 -> buffer[3][2]
+[DEBUG] Read DATA[1,3] =       1222 -> buffer[3][2]
 [DEBUG] Read DATA[1,3] =       1222 -> buffer[3][2]
 [DEBUG] Storing rdata=      1222 at buffer[3][2]
 [DEBUG] Read REQ: block( 1, 0), type=TR, row=2, addr=00000050
@@ -150,6 +162,7 @@
 [DEBUG] Storing rdata=      2546 at buffer[2][3]
 [DEBUG] Read DATA[2,3] =       2546 -> buffer[3][3]
 [DEBUG] Read DATA[2,3] =       1742 -> buffer[3][3]
+[DEBUG] Read DATA[2,3] =       1742 -> buffer[3][3]
 [DEBUG] Storing rdata=      1742 at buffer[3][3]
 [DEBUG] Read REQ: block( 1, 0), type=TR, row=3, addr=00000070
 [DEBUG] Read DATA[3,0] =       2093 -> buffer[0][4]
@@ -162,6 +175,7 @@
 [DEBUG] Storing rdata=       611 at buffer[2][4]
 [DEBUG] Read DATA[3,3] =        611 -> buffer[3][4]
 [DEBUG] Read DATA[3,3] =       1802 -> buffer[3][4]
+[DEBUG] Read DATA[3,3] =       1802 -> buffer[3][4]
 [DEBUG] Storing rdata=      1802 at buffer[3][4]
 [DEBUG] Processing block type  1, total_rows=5
 [DEBUG] Starting row 0, len=5, awlen will be          4
@@ -171,6 +185,7 @@
 [DEBUG] Starting row 0, len=5, awlen will be          4
 [DEBUG] Write REQ: block( 1, 0), type=TR, row=0, len= 4, addr=00000a14
 [DEBUG] write_len= 5, awlen_o= 4, burst_cnt_n= 4
+[DEBUG] Buffer row 0: [0]=      2029, [1]=      1932, [2]=      2553, [3]=      1222, [4]=      2553
 [DEBUG] Write DATA[ 0] =       3341 (from buffer[ 0][0])
 [DEBUG] Write DATA[ 1] =       3341 (from buffer[ 1][0])
 [DEBUG] Write DATA[ 1] =       1932 (from buffer[ 1][0])
@@ -183,6 +198,7 @@
 [DEBUG] Row 0 completed, moving to row          1
 [DEBUG] Write REQ: block( 1, 0), type=TR, row=1, len= 4, addr=00000a3c
 [DEBUG] write_len= 5, awlen_o= 4, burst_cnt_n= 4
+[DEBUG] Buffer row 1: [0]=      2829, [1]=      2445, [2]=      1125, [3]=       530, [4]=      1125
 [DEBUG] Write DATA[ 0] =       2829 (from buffer[ 0][1])
 [DEBUG] Write DATA[ 1] =       2829 (from buffer[ 1][1])
 [DEBUG] Write DATA[ 1] =       2445 (from buffer[ 1][1])
@@ -195,6 +211,7 @@
 [DEBUG] Row 1 completed, moving to row          2
 [DEBUG] Write REQ: block( 1, 0), type=TR, row=2, len= 4, addr=00000a64
 [DEBUG] write_len= 5, awlen_o= 4, burst_cnt_n= 4
+[DEBUG] Buffer row 2: [0]=      2029, [1]=      1932, [2]=      2553, [3]=      1222, [4]=      2553
 [DEBUG] Write DATA[ 0] =       2029 (from buffer[ 0][2])
 [DEBUG] Write DATA[ 1] =       2029 (from buffer[ 1][2])
 [DEBUG] Write DATA[ 1] =       1932 (from buffer[ 1][2])
@@ -207,6 +224,7 @@
 [DEBUG] Row 2 completed, moving to row          3
 [DEBUG] Write REQ: block( 1, 0), type=TR, row=3, len= 4, addr=00000a8c
 [DEBUG] write_len= 5, awlen_o= 4, burst_cnt_n= 4
+[DEBUG] Buffer row 3: [0]=      1554, [1]=      2959, [2]=      2546, [3]=      1742, [4]=      2546
 [DEBUG] Write DATA[ 0] =       1554 (from buffer[ 0][3])
 [DEBUG] Write DATA[ 1] =       1554 (from buffer[ 1][3])
 [DEBUG] Write DATA[ 1] =       2959 (from buffer[ 1][3])
@@ -219,6 +237,7 @@
 [DEBUG] Row 3 completed, moving to row          4
 [DEBUG] Write REQ: block( 1, 0), type=TR, row=4, len= 4, addr=00000ab4
 [DEBUG] write_len= 5, awlen_o= 4, burst_cnt_n= 4
+[DEBUG] Buffer row 4: [0]=      2093, [1]=      1637, [2]=       611, [3]=      1802, [4]=       611
 [DEBUG] Write DATA[ 0] =       2093 (from buffer[ 0][4])
 [DEBUG] Write DATA[ 1] =       2093 (from buffer[ 1][4])
 [DEBUG] Write DATA[ 1] =       1637 (from buffer[ 1][4])
@@ -240,6 +259,7 @@
 [DEBUG] Storing rdata=      1450 at buffer[3][0]
 [DEBUG] Read DATA[0,3] =       1450 -> buffer[4][0]
 [DEBUG] Read DATA[0,3] =       3229 -> buffer[4][0]
+[DEBUG] Read DATA[0,3] =       3229 -> buffer[4][0]
 [DEBUG] Storing rdata=      3229 at buffer[4][0]
 [DEBUG] Read REQ: block( 0, 1), type=BL, row=1, addr=000000a0
 [DEBUG] Read DATA[1,0] =       3435 -> buffer[1][1]
@@ -251,6 +271,7 @@
 [DEBUG] Read DATA[1,2] =       2562 -> buffer[3][1]
 [DEBUG] Storing rdata=      2562 at buffer[3][1]
 [DEBUG] Read DATA[1,3] =       2562 -> buffer[4][1]
+[DEBUG] Read DATA[1,3] =       3758 -> buffer[4][1]
 [DEBUG] Read DATA[1,3] =       3758 -> buffer[4][1]
 [DEBUG] Storing rdata=      3758 at buffer[4][1]
 [DEBUG] Read REQ: block( 0, 1), type=BL, row=2, addr=000000c0
@@ -264,6 +285,7 @@
 [DEBUG] Storing rdata=      3570 at buffer[3][2]
 [DEBUG] Read DATA[2,3] =       3570 -> buffer[4][2]
 [DEBUG] Read DATA[2,3] =        394 -> buffer[4][2]
+[DEBUG] Read DATA[2,3] =        394 -> buffer[4][2]
 [DEBUG] Storing rdata=       394 at buffer[4][2]
 [DEBUG] Read REQ: block( 0, 1), type=BL, row=3, addr=000000e0
 [DEBUG] Read DATA[3,0] =       3563 -> buffer[1][3]
@@ -276,6 +298,7 @@
 [DEBUG] Storing rdata=      2502 at buffer[3][3]
 [DEBUG] Read DATA[3,3] =       2502 -> buffer[4][3]
 [DEBUG] Read DATA[3,3] =        942 -> buffer[4][3]
+[DEBUG] Read DATA[3,3] =        942 -> buffer[4][3]
 [DEBUG] Storing rdata=       942 at buffer[4][3]
 [DEBUG] Processing block type  2, total_rows=5
 [DEBUG] Starting row 0, len=5, awlen will be          4
@@ -285,6 +308,7 @@
 [DEBUG] Starting row 0, len=5, awlen will be          4
 [DEBUG] Write REQ: block( 0, 1), type=BL, row=0, len= 4, addr=00000ac8
 [DEBUG] write_len= 5, awlen_o= 4, burst_cnt_n= 4
+[DEBUG] Buffer row 0: [0]=       288, [1]=       640, [2]=       288, [3]=      1450, [4]=      3229
 [DEBUG] Write DATA[ 0] =       2029 (from buffer[ 0][0])
 [DEBUG] Write DATA[ 1] =       2029 (from buffer[ 1][0])
 [DEBUG] Write DATA[ 1] =        640 (from buffer[ 1][0])
@@ -297,6 +321,7 @@
 [DEBUG] Row 0 completed, moving to row          1
 [DEBUG] Write REQ: block( 0, 1), type=BL, row=1, len= 4, addr=00000af0
 [DEBUG] write_len= 5, awlen_o= 4, burst_cnt_n= 4
+[DEBUG] Buffer row 1: [0]=      2773, [1]=      3435, [2]=      2773, [3]=      2562, [4]=      3758
 [DEBUG] Write DATA[ 0] =       2773 (from buffer[ 0][1])
 [DEBUG] Write DATA[ 1] =       2773 (from buffer[ 1][1])
 [DEBUG] Write DATA[ 1] =       3435 (from buffer[ 1][1])
@@ -309,6 +334,7 @@
 [DEBUG] Row 1 completed, moving to row          2
 [DEBUG] Write REQ: block( 0, 1), type=BL, row=2, len= 4, addr=00000b18
 [DEBUG] write_len= 5, awlen_o= 4, burst_cnt_n= 4
+[DEBUG] Buffer row 2: [0]=      3132, [1]=      2762, [2]=      3132, [3]=      3570, [4]=       394
 [DEBUG] Write DATA[ 0] =       3132 (from buffer[ 0][2])
 [DEBUG] Write DATA[ 1] =       3132 (from buffer[ 1][2])
 [DEBUG] Write DATA[ 1] =       2762 (from buffer[ 1][2])
@@ -321,6 +347,7 @@
 [DEBUG] Row 2 completed, moving to row          3
 [DEBUG] Write REQ: block( 0, 1), type=BL, row=3, len= 4, addr=00000b40
 [DEBUG] write_len= 5, awlen_o= 4, burst_cnt_n= 4
+[DEBUG] Buffer row 3: [0]=      1462, [1]=      3563, [2]=      1462, [3]=      2502, [4]=       942
 [DEBUG] Write DATA[ 0] =       1462 (from buffer[ 0][3])
 [DEBUG] Write DATA[ 1] =       1462 (from buffer[ 1][3])
 [DEBUG] Write DATA[ 1] =       3563 (from buffer[ 1][3])
@@ -333,6 +360,7 @@
 [DEBUG] Row 3 completed, moving to row          4
 [DEBUG] Write REQ: block( 0, 1), type=BL, row=4, len= 4, addr=00000b68
 [DEBUG] write_len= 5, awlen_o= 4, burst_cnt_n= 4
+[DEBUG] Buffer row 4: [0]=      3132, [1]=      2762, [2]=      3132, [3]=      3570, [4]=       394
 [DEBUG] Write DATA[ 0] =       3132 (from buffer[ 0][4])
 [DEBUG] Write DATA[ 1] =       3132 (from buffer[ 1][4])
 [DEBUG] Write DATA[ 1] =       2762 (from buffer[ 1][4])
@@ -354,6 +382,7 @@
 [DEBUG] Storing rdata=      2061 at buffer[2][0]
 [DEBUG] Read DATA[0,3] =       2061 -> buffer[3][0]
 [DEBUG] Read DATA[0,3] =       1619 -> buffer[3][0]
+[DEBUG] Read DATA[0,3] =       1619 -> buffer[3][0]
 [DEBUG] Storing rdata=      1619 at buffer[3][0]
 [DEBUG] Read REQ: block( 1, 1), type=BR, row=1, addr=000000b0
 [DEBUG] Read DATA[1,0] =       2333 -> buffer[0][1]
@@ -365,6 +394,7 @@
 [DEBUG] Read DATA[1,2] =       2339 -> buffer[2][1]
 [DEBUG] Storing rdata=      2339 at buffer[2][1]
 [DEBUG] Read DATA[1,3] =       2339 -> buffer[3][1]
+[DEBUG] Read DATA[1,3] =       1290 -> buffer[3][1]
 [DEBUG] Read DATA[1,3] =       1290 -> buffer[3][1]
 [DEBUG] Storing rdata=      1290 at buffer[3][1]
 [DEBUG] Read REQ: block( 1, 1), type=BR, row=2, addr=000000d0
@@ -378,6 +408,7 @@
 [DEBUG] Storing rdata=       888 at buffer[2][2]
 [DEBUG] Read DATA[2,3] =        888 -> buffer[3][2]
 [DEBUG] Read DATA[2,3] =        649 -> buffer[3][2]
+[DEBUG] Read DATA[2,3] =        649 -> buffer[3][2]
 [DEBUG] Storing rdata=       649 at buffer[3][2]
 [DEBUG] Read REQ: block( 1, 1), type=BR, row=3, addr=000000f0
 [DEBUG] Read DATA[3,0] =        700 -> buffer[0][3]
@@ -390,6 +421,7 @@
 [DEBUG] Storing rdata=      2571 at buffer[2][3]
 [DEBUG] Read DATA[3,3] =       2571 -> buffer[3][3]
 [DEBUG] Read DATA[3,3] =       3697 -> buffer[3][3]
+[DEBUG] Read DATA[3,3] =       3697 -> buffer[3][3]
 [DEBUG] Storing rdata=      3697 at buffer[3][3]
 [DEBUG] Processing block type  3, total_rows=5
 [DEBUG] Starting row 0, len=5, awlen will be          4
@@ -399,6 +431,7 @@
 [DEBUG] Starting row 0, len=5, awlen will be          4
 [DEBUG] Write REQ: block( 1, 1), type=BR, row=0, len= 4, addr=00000adc
 [DEBUG] write_len= 5, awlen_o= 4, burst_cnt_n= 4
+[DEBUG] Buffer row 0: [0]=      3734, [1]=      2067, [2]=      2061, [3]=      1619, [4]=      2061
 [DEBUG] Write DATA[ 0] =       3734 (from buffer[ 0][0])
 [DEBUG] Write DATA[ 1] =       3734 (from buffer[ 1][0])
 [DEBUG] Write DATA[ 1] =       2067 (from buffer[ 1][0])
@@ -411,6 +444,7 @@
 [DEBUG] Row 0 completed, moving to row          1
 [DEBUG] Write REQ: block( 1, 1), type=BR, row=1, len= 4, addr=00000b04
 [DEBUG] write_len= 5, awlen_o= 4, burst_cnt_n= 4
+[DEBUG] Buffer row 1: [0]=      2333, [1]=       719, [2]=      2339, [3]=      1290, [4]=      2339
 [DEBUG] Write DATA[ 0] =       2333 (from buffer[ 0][1])
 [DEBUG] Write DATA[ 1] =       2333 (from buffer[ 1][1])
 [DEBUG] Write DATA[ 1] =        719 (from buffer[ 1][1])
@@ -423,6 +457,7 @@
 [DEBUG] Row 1 completed, moving to row          2
 [DEBUG] Write REQ: block( 1, 1), type=BR, row=2, len= 4, addr=00000b2c
 [DEBUG] write_len= 5, awlen_o= 4, burst_cnt_n= 4
+[DEBUG] Buffer row 2: [0]=       833, [1]=      1240, [2]=       888, [3]=       649, [4]=       888
 [DEBUG] Write DATA[ 0] =        833 (from buffer[ 0][2])
 [DEBUG] Write DATA[ 1] =        833 (from buffer[ 1][2])
 [DEBUG] Write DATA[ 1] =       1240 (from buffer[ 1][2])
@@ -435,6 +470,7 @@
 [DEBUG] Row 2 completed, moving to row          3
 [DEBUG] Write REQ: block( 1, 1), type=BR, row=3, len= 4, addr=00000b54
 [DEBUG] write_len= 5, awlen_o= 4, burst_cnt_n= 4
+[DEBUG] Buffer row 3: [0]=       700, [1]=      3370, [2]=      2571, [3]=      3697, [4]=      2571
 [DEBUG] Write DATA[ 0] =        700 (from buffer[ 0][3])
 [DEBUG] Write DATA[ 1] =        700 (from buffer[ 1][3])
 [DEBUG] Write DATA[ 1] =       3370 (from buffer[ 1][3])
@@ -447,6 +483,7 @@
 [DEBUG] Row 3 completed, moving to row          4
 [DEBUG] Write REQ: block( 1, 1), type=BR, row=4, len= 4, addr=00000b7c
 [DEBUG] write_len= 5, awlen_o= 4, burst_cnt_n= 4
+[DEBUG] Buffer row 4: [0]=       833, [1]=      1240, [2]=       888, [3]=       649, [4]=       888
 [DEBUG] Write DATA[ 0] =        833 (from buffer[ 0][4])
 [DEBUG] Write DATA[ 1] =        833 (from buffer[ 1][4])
 [DEBUG] Write DATA[ 1] =       1240 (from buffer[ 1][4])
